@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en" ng-app>
+
+<head>
+    <title>Training Data</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script type="text/javascipt">
+        function addFields(){ }
+    </script>
+</head>
+
+<body>
+    <form method="post" action="http://yoga-master-training-server-duttaoindril.c9users.io:8080/postapi" class="inline">
+        <input name="url" placeholder="YouTube Link">
+        <br>
+        <input name="startTimeStamp1" placeholder="TimeStamp Start 1">
+        <input name="endTimeStamp1" placeholder="TimeStamp End 1:">
+        <select name="selectedPose1"> <!--Warrior 2, Tree, Triangle-->
+              <option value="warriorII">Warrior 2 Pose</option>
+              <option value="tree">Tree Pose</option>
+              <option value="triangle">Triangle Pose</option>
+        </select>
+        <br>
+        <div id="add"></div>
+        <input type="submit" value="Submit">
+    </form>
+    <a href="#" id="addFields" onclick="addFields()">Add More Data</a>
+    <script type="text/javascript">
+        var count = 2;
+        function addFields() {
+            //code for adding the next three fields again; seperate with br
+            console.log("Adding #"+count+" fields...");
+            count+=1;
+        }
+    </script>
+</body>
+
+</html>
