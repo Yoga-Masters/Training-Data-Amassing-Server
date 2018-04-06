@@ -4,33 +4,112 @@
 <head>
     <title>Training Data</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script type="text/javascipt">
-        function addFields(){ }
-    </script>
+    <style>
+        body {
+            text-align: center;
+        }
+        input {
+            width: 19%;
+            /*min-width: 150px;*/
+        }
+        select {
+            width: 19%;
+        }
+    </style>
 </head>
 
 <body>
+    <input type="button" value="Add More Data" onclick="addFields();" />
+    <input type="button" value="Delete Last Data" onclick="delFields();" />
     <form method="post" action="http://yoga-master-training-server-duttaoindril.c9users.io:8080/postapi" class="inline">
-        <input name="url" placeholder="YouTube Link">
-        <br>
-        <input name="startTimeStamp1" placeholder="TimeStamp Start 1">
-        <input name="endTimeStamp1" placeholder="TimeStamp End 1:">
-        <select name="selectedPose1"> <!--Warrior 2, Tree, Triangle-->
-              <option value="warriorII">Warrior 2 Pose</option>
-              <option value="tree">Tree Pose</option>
-              <option value="triangle">Triangle Pose</option>
-        </select>
+        <input name="url" placeholder="YouTube Link 1" required>
         <br>
         <div id="add"></div>
         <input type="submit" value="Submit">
     </form>
-    <a href="#" id="addFields" onclick="addFields()">Add More Data</a>
     <script type="text/javascript">
-        var count = 2;
+        var count = 1;
         function addFields() {
-            //code for adding the next three fields again; seperate with br
+            //code for adding the next three fields again
+            
+            // var newLink = document.createElement('input');
+            // newLink.type = "text";
+            // newLink.name = "url"+count;
+            // newLink.id = "newUrl"+count;
+            // newLink.placeholder = "YouTube Link " + count;
+            // var name = "test"+(count-1);
+            // document.getElementById(name).appendChild(newLink);
+            
+            var newStartMin = document.createElement('input');
+            newStartMin.setAttribute("placeholder", "TimeStamp Minute Start "+count);
+            newStartMin.setAttribute("name", "startTimeStampMin"+count);
+            newStartMin.setAttribute("id", "startTimeStampMin"+count);
+            newStartMin.setAttribute("type", "number");
+            newStartMin.setAttribute("step", "1");
+            newStartMin.setAttribute("min", "0");
+            newStartMin.setAttribute("required", true);
+            document.getElementById("add").appendChild(newStartMin);
+            
+            var newStartSec = document.createElement('input');
+            newStartSec.setAttribute("placeholder", "TimeStamp Second Start "+count);
+            newStartSec.setAttribute("name", "startTimeStampSec"+count);
+            newStartSec.setAttribute("id", "startTimeStampSec"+count);
+            newStartSec.setAttribute("type", "number");
+            newStartSec.setAttribute("step", "1");
+            newStartSec.setAttribute("min", "0");
+            newStartSec.setAttribute("max", "60");
+            newStartSec.setAttribute("required", true);
+            document.getElementById("add").appendChild(newStartSec);
+            
+            var newEndMin = document.createElement('input');
+            newEndMin.setAttribute("placeholder", "TimeStamp Minute End " + count);
+            newEndMin.setAttribute("name", "endTimeStampMin"+count);
+            newEndMin.setAttribute("id", "endTimeStampMin"+count);
+            newEndMin.setAttribute("type", "number");
+            newEndMin.setAttribute("min", "0");
+            newEndMin.setAttribute("step", "1");
+            newEndMin.setAttribute("required", true);
+            document.getElementById("add").appendChild(newEndMin);
+            
+            var newEndSec = document.createElement('input');
+            newEndSec.setAttribute("placeholder", "TimeStamp Second End "+count);
+            newEndSec.setAttribute("name", "endTimeStampSec"+count);
+            newEndSec.setAttribute("id", "endTimeStampSec"+count);
+            newEndSec.setAttribute("type", "number");
+            newEndSec.setAttribute("step", "1");
+            newEndSec.setAttribute("min", "0");
+            newEndSec.setAttribute("max", "60");
+            newEndSec.setAttribute("required", true);
+            document.getElementById("add").appendChild(newEndSec);
+            
+            var newSelect = document.createElement('select')
+            newSelect.setAttribute("name", "SelectedPose"+count);
+            newSelect.setAttribute("id", "SelectedPose"+count);
+            newSelect.setAttribute("required", true);
+            var array = ["warriorII", "tree", "triangle"];
+            var arrayText = ["Warrior 2 Pose", "Tree Pose", "Triangle Pose"];
+            for (var i = 0; i < 3; i++) {
+                var option = document.createElement("option");
+                option.value = array[i];
+                option.text = arrayText[i];
+                newSelect.appendChild(option);
+            }
+            document.getElementById("add").appendChild(newSelect);
             console.log("Adding #"+count+" fields...");
             count+=1;
+        }
+        
+        function delFields() {
+            //code for deleting the last three fields
+            if(count == 1)
+                return;
+            count-=1;
+            console.log("Deleting #"+count+" fields...");
+            document.getElementById('startTimeStampMin'+count).remove();
+            document.getElementById('startTimeStampSec'+count).remove();
+            document.getElementById('endTimeStampMin'+count).remove();
+            document.getElementById('endTimeStampSec'+count).remove();
+            document.getElementById('SelectedPose'+count).remove();
         }
     </script>
 </body>
