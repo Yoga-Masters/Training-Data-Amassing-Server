@@ -45,6 +45,7 @@ tdb.ref("frames").on("value", snap => {
     for (const key of Object.keys(snap.val())) {
         if (!snap.val()[key].hasOwnProperty("download") || snap.val()[key].download) {
             var time = Date.now();
+            ensureDirectoryExistence("./training/key.json");
             fs.writeFile("./training/" + key + ".json", JSON.stringify(snap.val()[key]), 'utf8');
             console.log("Wrote new " + snap.val()[key].pose + " pose frame " + (Date.now() - time) + "ms ago! Check it out @: " + snap.val()[key].originalFrameLink);
         }
@@ -54,7 +55,8 @@ tdb.ref("frames").on("value", snap => {
 tdb.ref("latestFrame").on("value", snap => {
     var ext = snap.val().split(';')[0].match(/jpeg|png|gif|jpg|webp/)[0];
     var time = Date.now();
-    require("fs").writeFile("processing/pictures/latestFrame." + ext, snap.val().replace(/^data:image\/\w+;base64,/, ""), 'base64', err => {
+    ensureDirectoryExistence("./processing/pictures/frame.png");
+    fs.writeFile("./processing/pictures/latestFrame." + ext, snap.val().replace(/^data:image\/\w+;base64,/, ""), 'base64', err => {
         console.log("Saved new frame in " + (Date.now() - time) + "ms to processing/pictures/latestFrame." + ext + "...");
     });
 });

@@ -58,10 +58,8 @@ typings/
 .env
 
 # Everything related to video -> frames and frames -> Openpose data
-
 processing/
+training/
 
 # Specific JSON Private Keys
-yoga-master-training-db-d9acdc86dca0.json
-
-yoga-master-app-774bc242a8b4.json
+json/
