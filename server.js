@@ -1,4 +1,4 @@
-// ===================== GLOBALS SETUP ===========================
+// ============================= GLOBALS SETUP =================================
 var size = 100;
 var maxFPS = 30;
 const fs = require('fs');
@@ -11,7 +11,7 @@ const express = require('express');
 const admin = require("firebase-admin");
 const bodyParser = require("body-parser");
 const exec = require('child_process').execFile;
-// ======================= APP SETUP =============================
+// =============================== APP SETUP ===================================
 const app = express();
 const server = http.createServer(app);
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -19,28 +19,35 @@ app.use(bodyParser.json());
 app.use(cors());
 app.use(express.static(path.resolve(__dirname, 'client')));
 server.listen(process.env.PORT || 3000, process.env.IP || "0.0.0.0", () => console.log("Youtube Downloader listening at", server.address().address + ":" + server.address().port));
-// ===================== FIREBASE SETUP ==========================
+// ============================ FIREBASE SETUP =================================
 admin.initializeApp({ // Connecting to Firebase Training Database
     credential: admin.credential.cert(require("./json/yoga-master-training-db-d9acdc86dca0.json")),
-    databaseURL: "https://yoga-master-training-db.firebaseio.com"
+    databaseURL: "https://yoga-master-training-db.firebaseio.com",
+    storageBucket: "yoga-master-training-db.appspot.com/"
 });
 var appAdmin = admin.initializeApp({ // Connecting to Firebase App Database
     credential: admin.credential.cert(require("./json/yoga-master-app-774bc242a8b4.json")),
-    databaseURL: "https://yoga-master-app.firebaseio.com"
+    databaseURL: "https://yoga-master-app.firebaseio.com",
+    storageBucket: "yoga-master-app.appspot.com"
 }, "app");
 console.log("Connected to training data firebase as \"" + admin.app().name + "\"");
 console.log("Connected to yogamaster app firebase as \"" + appAdmin.name + "\"");
 var tauth = admin.auth();
 var tdb = admin.database();
+// var tbucket = admin.storage().bucket();
 var aauth = appAdmin.auth();
 var adb = appAdmin.database();
-// === PASSIVE FIREBASE FUNCTIONS (MAY MOVE TO CLOUD FUNCTIONS) ==
-// Original Image -> Linked to cloud storage
-// Openpose Img -> 100x100 px version of openpose output
-// Training Img -> Original img cropped to person, grayscaled and scaled down to 100x100 px
-// Angles 1-n -> Array of angles
-// Pose -> The pose done in the image
-// download -> Whether to download this data or not.
+// var abucket = appAdmin.storage().bucket();
+// tbucket.upload("img.jpg")
+//     .then((data) => {
+//         console.log(data);
+//         console.log(data[0]);
+//         console.log(data[1]);
+//     })
+//     .catch(err => {
+//         console.error('ERROR:', err);
+//     });
+// ========================= PASSIVE FIREBASE FUNCTIONS ========================
 tdb.ref("frames").on("value", snap => {
     for (const key of Object.keys(snap.val())) {
         if (!snap.val()[key].hasOwnProperty("download") || snap.val()[key].download) {
@@ -52,7 +59,7 @@ tdb.ref("frames").on("value", snap => {
     }
 });
 
-tdb.ref("latestFrame").on("value", snap => {
+tdb.ref("latestFrame").on("value", snap => { // MAY MOVE TO FB CLOUD FUNCTIONS
     var ext = snap.val().split(';')[0].match(/jpeg|png|gif|jpg|webp/)[0];
     var time = Date.now();
     ensureDirectoryExistence("./processing/pictures/frame.png");
@@ -70,12 +77,8 @@ adb.ref("maxFPS").on("value", snap => {
     maxFPS = snap.val();
     console.log("maxFPS got updated to: " + maxFPS + "px!");
 });
-// ===================== ROUTING SETUP ===========================
+// =============================== ROUTING SETUP ===============================
 app.get('/api', (req, res) => res.send({ "return": 'Hello World @ Yoga Master App & Training Server DB API!' }));
-
-// app.get('/api/openpose', (req, res) => { // Handles individual img openpose handling; useful for demo
-//     var base64Data = req.query.img;
-// });
 
 app.get('/api/getpost', (req, res) => {
     console.log("Got a GET POST: " + req.query);
@@ -87,15 +90,14 @@ app.post('/postapi', (req, res) => {
     handleTrainingDataPost(req.body);
     res.redirect('/');
 });
-
-// ========================== CALL FUNCTIONS ==========================
-function handleTrainingDataPost(body) {
+// =============================== CALL FUNCTIONS ==============================
+function handleTrainingDataPost(body) { // Download a video, convert it to frames, then upload the processed frames to firebase to train.
     var framesFolder = getRandomKey();
     var videoID = ytdl.getVideoID(body.url);
     var validVideo = ytdl.validateURL("youtube.com/watch?v=" + videoID);
     if (!validVideo)
         console.log("No video found OR not a valid video with ID \"" + videoID + "\" from \"" + body.url + "\"");
-    else downloadYoutubeVideo(videoID, framesFolder, (fps, videoPath) => {
+    else downloadYoutubeVideo(videoID, framesFolder, (fps) => {
         var framesDict = {};
         var length = (Object.keys(body).length - 1) / 5;
         console.log("body: " + JSON.stringify(body));
@@ -112,8 +114,19 @@ function handleTrainingDataPost(body) {
     });
 }
 
+function checkFramesComplete(check, pose, video, folder) {
+    for (const pose of Object.keys(check))
+        if (!check[pose]) return;
+    console.log("After finishing pose " + pose + ", we are at: ");
+    console.log(check);
+    console.log("All frames for video " + video + " at folder " + folder + " have been extracted!");
+
+}
+
 function convertToFrames(framesDict, id, folder, fps) { // ffmpeg -i video.mp4 -vf select='eq(n\,30)+eq(n\,31)' -vsync 0 frames+"selectedPose"+%d.jpg
     var framesList = "";
+    var completion = {};
+    for (const pose of Object.keys(framesDict)) completion[pose] = false;
     console.log("fps: " + fps);
     console.log("maxFPS: " + maxFPS);
     console.log("videoID: " + id);
@@ -121,18 +134,18 @@ function convertToFrames(framesDict, id, folder, fps) { // ffmpeg -i video.mp4 -
     console.log("framesDict: " + JSON.stringify(framesDict));
     ensureDirectoryExistence("./processing/videos/" + id + "/" + folder + "/1.jpg");
     for (const pose of Object.keys(framesDict)) {
-        framesDict[pose].forEach(function(frame) {
-            for (var i = frame[0]; i <= frame[1]; i += (fps / maxFPS))
-                framesList = framesList + "eq(n\\," + i + ")+";
-        });
+        framesDict[pose].forEach(frame => { for (var i = frame[0]; i <= frame[1]; i += (fps / maxFPS)) framesList = framesList + "eq(n\\," + i + ")+" });
         framesList = framesList.slice(0, -1);
-        console.log("framesList: " + framesList);
         console.log("Putting framesList frames for " + pose + " into " + id + "/" + folder);
+        console.log("framesList: " + framesList);
         exec('ffmpeg', [
             '-i', "./processing/videos/" + id + "/video.mp4",
             '-vf', 'select=\'' + framesList + '\'',
             '-vsync', '0', "./processing/videos/" + id + "/" + folder + "/" + pose + "%d.jpg"
-        ]);
+        ], (error, stdout, stderr) => {
+            completion[pose] = true;
+            checkFramesComplete(completion, pose, id, folder);
+        });
         framesList = "";
     }
 }
@@ -149,14 +162,14 @@ function getFPS(path, callback) { // ffprobe -v 0 -of csv=p=0 -select_streams 0 
     });
 }
 
-function downloadYoutubeVideo(url, folder, callback) {
+function downloadYoutubeVideo(url, folder, callback) { // Check if a video is downloaded and then download it, or skip ahead
     var dirname = "./processing/videos/" + url + "/video.mp4";
     ensureDirectoryExistence(dirname);
     if (!fs.existsSync(dirname)) {
         console.log("Found and downloading video " + url + " frames to folder " + folder + " at " + size + "px");
         var time = Date.now();
         var videoDownload = fs.createWriteStream(dirname);
-        ytdl("youtube.com/watch?v=" + url, { filter: (format) => format.container === 'mp4' }).pipe(videoDownload);
+        ytdl("youtube.com/watch?v=" + url, { quality: 'highestvideo', filter: (format) => format.container === 'mp4' && format.audioEncoding === null }).pipe(videoDownload);
         videoDownload.on('open', (data) => {
             console.log("Started downloading video after " + (Date.now() - time) + "ms");
         });
@@ -166,7 +179,7 @@ function downloadYoutubeVideo(url, folder, callback) {
         });
     }
     else {
-        console.log("Video " + url + " is already downloaded!");
+        console.log("Video " + url + " was already downloaded!");
         getFPS(dirname, callback);
     }
 }
@@ -182,74 +195,8 @@ function ensureDirectoryExistence(filePath) {
     fs.mkdirSync(dirname);
 }
 
-// https://github.com/cacheflow/youtube-video-to-frames/blob/master/index.js
-// ---------
-// const downloadVideo = () => {
-//     options = Object.assign(defaultVideoOptions, {})
-//     videoWriteStream = fs.createWriteStream(`${options.videoName}.mp4`)
-//     ytdl(options.videoUrl).pipe(videoWriteStream);
-//     videoWriteStream.on('open', (data) => {
-//         console.log("Downloading video before converting to frames.")
-//     })
-//     videoWriteStream.on('error', (err) => {
-//         errAndExit(err)
-//     })
-//     videoWriteStream.on('close', () => {
-//         let pluralOrSingular = options.fps > 1 ? 'frames' : 'frame'
-//         console.log(`Finished downloading video. Now screenshotting ${options.fps} ${pluralOrSingular} per second.`)
-//         convertVideoToFrames()
-//     })
-// }
-// ---------
-// const convertVideoToFrames = () => {
-//     let options = getOptions()
-//     let ffmpegVideoFrameProcess = spawn('ffmpeg', [
-//         '-i', `./${options.videoName}.mp4`,
-//         '-f', 'image2',
-//         '-bt', '20M',
-//         '-vf', `fps=${options.fps}`,
-//         `./${options.imgFileName}%03d.jpg`
-//     ])
-
-//     ffmpegVideoFrameProcess.stdout.on('data', (data) => {
-//         console.log(data.toString());
-//     });
-
-//     ffmpegVideoFrameProcess.stderr.on('data', (err) => {
-//         console.log(err.toString());
-//     });
-
-//     ffmpegVideoFrameProcess.stdout.on('close', (data) => {
-//         process.exit()
-//     });
-// }
-// ---------
-// //!!!!!!!!Video needs to be detected as done downloading, then you can do the math below:
-// //body contains url, timestamps and selected pose
-// console.log(body);
-// var length = (Object.keys(body).length - 1) / 5;
-// //turn timestamps into frames based off  video's fps as so: 'eq(n\,180)+eq(n\,210)'
-// var framesDict = {};
-// for (var i = 1; i < length; i++) {
-//     var startMin = body["startTimeStampMin" + i];
-//     var startSec = body["startTimeStampSec" + i];
-//     var endMin = body["endTimeStampMin" + i];
-//     var endSec = body["endTimeStampSec" + i];
-//     var pose = body["selectedPose" + i];
-//     var startTime = startMin * 60 + startSec;
-//     var endTime = endMin * 60 + endSec;
-//     var startFrame = startTime * fps;
-//     var endFrame = endTime * fps;
-//     if (framesDict[pose] === undefined) framesDict[pose] = [];
-//     framesDict[pose].push([startFrame, endFrame]);
-//     // framesDict[startFrame] = pose;
-//     // framesDict[endFrame] = pose;
-// }
-// convertToFrames(framesDict);
-// // convertToFrames(Object.keys(framesDict));
 // ---------
 // var s = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-
 //return Array(40).join().split(',').map(function() { return s.charAt(Math.floor(Math.random() * s.length)); }).join('');
 // var arr = new Uint8Array((len || 15) / 2);
 // window.crypto.getRandomValues(arr);
@@ -260,7 +207,14 @@ function ensureDirectoryExistence(filePath) {
 //  [start2, end2, pose],
 //  [start3, end3, pose]]
 // USING THE FORMAT BELOW:
-//{ "warriorII": [[start1, end1], [start2, end2]],
+//{ "warriorii": [[start1, end1], [start2, end2]],
 //  "triangle": [[start1, end1], [start2, end2]],
 //  "tree": [[start1, end1], [start2, end2]]}
 // ffmpeg -i ./processing/videos/UIrLyE7iz50/video.mp4 -vf select='eq(n\,30)+eq(n\,31)' -vsync 0 ./processing/videos/UIrLyE7iz50/e59cc9618ebb9fb3/warriorii%d.jpg
+// ---------
+// Original Image -> Linked to cloud storage
+// Openpose Img -> 100x100 px version of openpose output
+// Training Img -> Original img cropped to person, grayscaled and scaled down to 100x100 px
+// Angles 1-n -> Array of angles
+// Pose -> The pose done in the image
+// download -> Whether to download this data or not.

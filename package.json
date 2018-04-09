@@ -1,25 +1,26 @@
 {
-  "name": "training-data-amassing-server",
-  "version": "1.0.0",
-  "description": "The server that allows us to put in a YouTube Video with time-frames indicating positions, to analyze with OpenPose and do image conversions to store on our Firebase Training DB",
-  "main": "server.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon --ignore 'training/*.*' server.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Yoga-Masters/Training-Data-Amassing-Server.git"
-  },
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/Yoga-Masters/Training-Data-Amassing-Server/issues"
-  },
-  "homepage": "https://github.com/Yoga-Masters/Training-Data-Amassing-Server#readme",
-  "dependencies": {
-    "express": "^4.16.3",
-    "firebase-admin": "^5.11.0",
-    "youtube-video-to-frames": "^1.0.2"
-  }
+    "name": "training-data-amassing-server",
+    "version": "1.0.0",
+    "description": "The server that allows us to put in a YouTube Video with time-frames indicating positions, to analyze with OpenPose and do image conversions to store on our Firebase Training DB",
+    "main": "server.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "start": "nodemon --ignore 'training/*.*' --ignore 'processing/' server.js"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Yoga-Masters/Training-Data-Amassing-Server.git"
+    },
+    "author": "",
+    "license": "ISC",
+    "bugs": {
+        "url": "https://github.com/Yoga-Masters/Training-Data-Amassing-Server/issues"
+    },
+    "homepage": "https://github.com/Yoga-Masters/Training-Data-Amassing-Server#readme",
+    "dependencies": {
+        "express": "^4.16.3",
+        "fast-crc32c": "^1.0.4",
+        "firebase-admin": "^5.11.0",
+        "youtube-video-to-frames": "^1.0.2"
+    }
 }
