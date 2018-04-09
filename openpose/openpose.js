@@ -28,11 +28,9 @@ function main() {
 
     gm('./examples/imagePath')
         .resizeExact(100, 100)
-        .write('./examples/imageName' + '_gray.jpg', function (err) {
+        .write('./examples/imageName' + '_gray.jpg', function(err) {
             if (!err) console.log('done');
-    });
-    
-
+        });
 }
 
 
@@ -46,11 +44,11 @@ Arguments:  --image_dir [DIRECTORY]
 function runOpenPose(inputDir, outputDir) {
     console.log("Running OpenPose on " + inputDir)
     'use strict';
-    const
-        { spawnSync } = require( 'child_process' ),
-        ls = spawnSync( './openPoseDemo.exe', [ '--image_dir', inputDir,
-                                                '--write_keypoint_json', outputDir,
-                                                '--no_display'] );
+    const { spawnSync } = require('child_process'),
+        ls = spawnSync('./openPoseDemo.exe', ['--image_dir', inputDir,
+            '--write_keypoint_json', outputDir,
+            '--no_display'
+        ]);
     console.log('Done');
 }
 
@@ -105,33 +103,34 @@ function extractAngles(poseDataPath) {
     ...
     */
 
-    var neck =          getAngle(keypoints[3],  keypoints[4],  keypoints[0],  keypoints[1]);
-    var l_shoulder =    getAngle(keypoints[3],  keypoints[4],  keypoints[15], keypoints[16]);
-    var r_shoulder =    getAngle(keypoints[3],  keypoints[4],  keypoints[6],  keypoints[7]);
-    var l_arm =         getAngle(keypoints[15], keypoints[16], keypoints[18], keypoints[19]);
-    var r_arm =         getAngle(keypoints[6],  keypoints[7],  keypoints[9],  keypoints[10]);
-    var l_farm =        getAngle(keypoints[18], keypoints[19], keypoints[21], keypoints[22]);
-    var r_farm =        getAngle(keypoints[9],  keypoints[10], keypoints[12], keypoints[13]);
-    var l_spine =       getAngle(keypoints[3],  keypoints[4],  keypoints[33], keypoints[34]);
-    var r_spine =       getAngle(keypoints[3],  keypoints[4],  keypoints[24], keypoints[25]);
-    var l_thigh =       getAngle(keypoints[33], keypoints[34], keypoints[36], keypoints[37]);
-    var r_thigh =       getAngle(keypoints[24], keypoints[25], keypoints[27], keypoints[28]);
-    var l_leg =         getAngle(keypoints[36], keypoints[37], keypoints[39], keypoints[40]);
-    var r_leg =         getAngle(keypoints[27], keypoints[28], keypoints[30], keypoints[31]);
+    var neck = getAngle(keypoints[3], keypoints[4], keypoints[0], keypoints[1]);
+    var l_shoulder = getAngle(keypoints[3], keypoints[4], keypoints[15], keypoints[16]);
+    var r_shoulder = getAngle(keypoints[3], keypoints[4], keypoints[6], keypoints[7]);
+    var l_arm = getAngle(keypoints[15], keypoints[16], keypoints[18], keypoints[19]);
+    var r_arm = getAngle(keypoints[6], keypoints[7], keypoints[9], keypoints[10]);
+    var l_farm = getAngle(keypoints[18], keypoints[19], keypoints[21], keypoints[22]);
+    var r_farm = getAngle(keypoints[9], keypoints[10], keypoints[12], keypoints[13]);
+    var l_spine = getAngle(keypoints[3], keypoints[4], keypoints[33], keypoints[34]);
+    var r_spine = getAngle(keypoints[3], keypoints[4], keypoints[24], keypoints[25]);
+    var l_thigh = getAngle(keypoints[33], keypoints[34], keypoints[36], keypoints[37]);
+    var r_thigh = getAngle(keypoints[24], keypoints[25], keypoints[27], keypoints[28]);
+    var l_leg = getAngle(keypoints[36], keypoints[37], keypoints[39], keypoints[40]);
+    var r_leg = getAngle(keypoints[27], keypoints[28], keypoints[30], keypoints[31]);
 
     var output = [neck,
-                  l_shoulder,
-                  r_shoulder,
-                  l_arm,
-                  r_arm,
-                  l_farm,
-                  r_farm,
-                  l_spine,
-                  r_spine,
-                  l_thigh,
-                  r_thigh,
-                  l_leg,
-                  r_leg];
+        l_shoulder,
+        r_shoulder,
+        l_arm,
+        r_arm,
+        l_farm,
+        r_farm,
+        l_spine,
+        r_spine,
+        l_thigh,
+        r_thigh,
+        l_leg,
+        r_leg
+    ];
     return output;
 }
 
@@ -185,4 +184,3 @@ function degreesToRadians(degrees) {
 
 // Execute
 main();
-

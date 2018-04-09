@@ -33,10 +33,11 @@ var appAdmin = admin.initializeApp({ // Connecting to Firebase App Database
 console.log("Connected to training data firebase as \"" + admin.app().name + "\"");
 console.log("Connected to yogamaster app firebase as \"" + appAdmin.name + "\"");
 var tauth = admin.auth();
-var tdb = admin.database();
-// var tbucket = admin.storage().bucket();
 var aauth = appAdmin.auth();
+var tdb = admin.database();
 var adb = appAdmin.database();
+// ~~~~ CLOUD STORAGE EXPERIMENTATION : FAILURE ~~~~
+// var tbucket = admin.storage().bucket();
 // var abucket = appAdmin.storage().bucket();
 // tbucket.upload("img.jpg")
 //     .then((data) => {
@@ -47,6 +48,14 @@ var adb = appAdmin.database();
 //     .catch(err => {
 //         console.error('ERROR:', err);
 //     });
+// ~~~~ FILE READ -> OPENPOSE -> FIREBASE EXPERIMENT : SUCCEED ~~~~
+// fs.readdir("./processing/videos/UIrLyE7iz50/546adeb47c6f172c/", (err, files) => {
+//     files.forEach(file => {
+//         if (path.extname(file) == '.jpg')
+//             file = file.slice(0, -4);
+//         console.log(file);
+//     });
+// });
 // ========================= PASSIVE FIREBASE FUNCTIONS ========================
 tdb.ref("frames").on("value", snap => {
     for (const key of Object.keys(snap.val())) {
@@ -90,7 +99,7 @@ app.post('/postapi', (req, res) => {
     handleTrainingDataPost(req.body);
     res.redirect('/');
 });
-// =============================== CALL FUNCTIONS ==============================
+// ======================== YOUTUBE DOWNLOADER FUNCTIONS =======================
 function handleTrainingDataPost(body) { // Download a video, convert it to frames, then upload the processed frames to firebase to train.
     var framesFolder = getRandomKey();
     var videoID = ytdl.getVideoID(body.url);
@@ -119,8 +128,23 @@ function checkFramesComplete(check, pose, video, folder) {
         if (!check[pose]) return;
     console.log("After finishing pose " + pose + ", we are at: ");
     console.log(check);
-    console.log("All frames for video " + video + " at folder " + folder + " have been extracted!");
-
+    console.log("All frames for video " + video + " at folder " + folder + " have been extracted! Running Openpose on them...");
+    runOpenPose("./processing/videos/" + video + "/" + folder + "/", () => {
+        console.log("Finished running openPoseDemo! Reading all images in 1 by 1 now...");
+        fs.readdir("./processing/videos/" + video + "/" + folder + "/", (err, files) => {
+            files.forEach(file => {
+                if (path.extname(file) != '.jpg') return;
+                file = file.slice(0, -4);
+                var openPoseAngles = extractAngles("./processing/videos/" + video + "/" + folder + "/" + file + "_keypoints.json");
+                tdb.ref("frames/" + video + "-" + folder + "-" + file).set({
+                    "angles": openPoseAngles,
+                    "pose": pose,
+                    "trainingFrame": "", // <- BASE 64 OF 100x100 grayscaled and cropped training images
+                    "openPoseFrame": "", // <- BASE 64 OF 100x100 cropped openpose output images
+                });
+            });
+        });
+    });
 }
 
 function convertToFrames(framesDict, id, folder, fps) { // ffmpeg -i video.mp4 -vf select='eq(n\,30)+eq(n\,31)' -vsync 0 frames+"selectedPose"+%d.jpg
@@ -183,6 +207,34 @@ function downloadYoutubeVideo(url, folder, callback) { // Check if a video is do
         getFPS(dirname, callback);
     }
 }
+
+// ==================== OPENPOSE + IMG PROCESSING FUNCTIONS ====================
+function runOpenPose(dir, callback) { // OpenPoseDemo.exe --image_dir [DIRECTORY] --write_images [DIRECTORY] --write_keypoint_json [DIRECTORY] --no_display
+    console.log("Running openPoseDemo on \"" + dir + "\"...");
+    exec("openPoseDemo", ["--image_dir", dir,
+        // "--write_images", dir,
+        "--write_keypoint_json", dir,
+        "--no_display"
+    ], (error, stdout, stderr) => { callback(); });
+}
+
+function extractAngles(poseDataPath) {
+    var keypoints = JSON.parse(fs.readFileSync(poseDataPath, 'utf8')).people[0].pose_keypoints; // Read JSON file, Extract pose data from an array of 54 numbers
+    return [getAngle(keypoints[3], keypoints[4], keypoints[0], keypoints[1]),
+        getAngle(keypoints[3], keypoints[4], keypoints[15], keypoints[16]),
+        getAngle(keypoints[3], keypoints[4], keypoints[6], keypoints[7]),
+        getAngle(keypoints[15], keypoints[16], keypoints[18], keypoints[19]),
+        getAngle(keypoints[6], keypoints[7], keypoints[9], keypoints[10]),
+        getAngle(keypoints[18], keypoints[19], keypoints[21], keypoints[22]),
+        getAngle(keypoints[9], keypoints[10], keypoints[12], keypoints[13]),
+        getAngle(keypoints[3], keypoints[4], keypoints[33], keypoints[34]),
+        getAngle(keypoints[3], keypoints[4], keypoints[24], keypoints[25]),
+        getAngle(keypoints[33], keypoints[34], keypoints[36], keypoints[37]),
+        getAngle(keypoints[24], keypoints[25], keypoints[27], keypoints[28]),
+        getAngle(keypoints[36], keypoints[37], keypoints[39], keypoints[40]),
+        getAngle(keypoints[27], keypoints[28], keypoints[30], keypoints[31])
+    ];
+}
 // ========================== HELPER FUNCTIONS ==========================
 function getRandomKey(len) {
     return crypto.randomBytes(Math.floor(len / 2) || 8).toString('hex');
@@ -193,6 +245,24 @@ function ensureDirectoryExistence(filePath) {
     if (fs.existsSync(dirname)) return true;
     ensureDirectoryExistence(dirname);
     fs.mkdirSync(dirname);
+}
+
+function getAngle(x1, y1, x2, y2) { // Convert lines to vectors
+    var vectorX = x2 - y1;
+    var vectorY = y2 - y1;
+    var magnitude = Math.pow((Math.pow(vectorX, 2) + Math.pow(vectorY, 2)), 0.5);
+    var angle = radiansToDegrees(Math.acos(vectorY / magnitude));
+    if (x2 >= x1)
+        return angle;
+    return 360 - angle;
+}
+
+function radiansToDegrees(radians) {
+    return (radians * 180 / Math.PI);
+}
+
+function degreesToRadians(degrees) {
+    return (degrees * Math.PI / 180);
 }
 
 // ---------
