@@ -83,8 +83,8 @@
             document.getElementById("add").appendChild(newEndSec);
             
             var newSelect = document.createElement('select')
-            newSelect.setAttribute("name", "SelectedPose"+count);
-            newSelect.setAttribute("id", "SelectedPose"+count);
+            newSelect.setAttribute("name", "selectedPose"+count);
+            newSelect.setAttribute("id", "selectedPose"+count);
             newSelect.setAttribute("required", true);
             var array = ["warriorII", "tree", "triangle"];
             var arrayText = ["Warrior 2 Pose", "Tree Pose", "Triangle Pose"];
@@ -109,7 +109,7 @@
             document.getElementById('startTimeStampSec'+count).remove();
             document.getElementById('endTimeStampMin'+count).remove();
             document.getElementById('endTimeStampSec'+count).remove();
-            document.getElementById('SelectedPose'+count).remove();
+            document.getElementById('selectedPose'+count).remove();
         }
     </script>
 </body>

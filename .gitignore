@@ -57,7 +57,11 @@ typings/
 # dotenv environment variables file
 .env
 
+# Everything related to video -> frames and frames -> Openpose data
+
+processing/
+
+# Specific JSON Private Keys
 yoga-master-training-db-d9acdc86dca0.json
 
-.flv
-.mp4
+yoga-master-app-774bc242a8b4.json
