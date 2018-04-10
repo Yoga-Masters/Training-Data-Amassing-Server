@@ -14,7 +14,9 @@ const exec = require('child_process').execFile;
 // =============================== APP SETUP ===================================
 const app = express();
 const server = http.createServer(app);
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.urlencoded({
+    extended: false
+}));
 app.use(bodyParser.json());
 app.use(cors());
 app.use(express.static(path.resolve(__dirname, 'client')));
@@ -87,11 +89,15 @@ adb.ref("maxFPS").on("value", snap => {
     console.log("maxFPS got updated to: " + maxFPS + "px!");
 });
 // =============================== ROUTING SETUP ===============================
-app.get('/api', (req, res) => res.send({ "return": 'Hello World @ Yoga Master App & Training Server DB API!' }));
+app.get('/api', (req, res) => res.send({
+    "return": 'Hello World @ Yoga Master App & Training Server DB API!'
+}));
 
 app.get('/api/getpost', (req, res) => {
     console.log("Got a GET POST: " + req.query);
-    res.send({ "rtrn": handleTrainingDataPost(JSON.stringify(req.query)) });
+    res.send({
+        "rtrn": handleTrainingDataPost(JSON.stringify(req.query))
+    });
 });
 
 app.post('/postapi', (req, res) => {
@@ -158,7 +164,9 @@ function convertToFrames(framesDict, id, folder, fps, time) { // ffmpeg -i video
     console.log("framesDict: " + JSON.stringify(framesDict));
     ensureDirectoryExistence("./processing/videos/" + id + "/" + folder + "/1.jpg");
     for (const pose of Object.keys(framesDict)) {
-        framesDict[pose].forEach(frame => { for (var i = frame[0]; i <= frame[1]; i += (fps / maxFPS)) framesList = framesList + "eq(n\\," + i + ")+" });
+        framesDict[pose].forEach(frame => {
+            for (var i = frame[0]; i <= frame[1]; i += (fps / maxFPS)) framesList = framesList + "eq(n\\," + i + ")+"
+        });
         framesList = framesList.slice(0, -1);
         console.log("Putting framesList frames for " + pose + " into " + id + "/" + folder);
         console.log("framesList: " + framesList);
@@ -188,24 +196,29 @@ function getFPS(path, callback) { // ffprobe -v 0 -of csv=p=0 -select_streams 0 
 }
 
 function downloadYoutubeVideo(url, folder, callback) { // Check if a video is downloaded and then download it, or skip ahead
-    var dirname = "./processing/videos/" + url + "/video.mp4";
-    ensureDirectoryExistence(dirname);
-    if (!fs.existsSync(dirname)) {
+    var dirName = "./processing/videos/" + url + "/video_writing.mp4";
+    var dirDone = "./processing/videos/" + url + "/video.mp4";
+    ensureDirectoryExistence(dirDone);
+    if (!fs.existsSync(dirDone)) {
         console.log("Found and downloading video " + url + " frames to folder " + folder + " at " + size + "px");
         var time = Date.now();
-        var videoDownload = fs.createWriteStream(dirname);
-        ytdl("youtube.com/watch?v=" + url, { quality: 'highestvideo', filter: (format) => format.container === 'mp4' && format.audioEncoding === null }).pipe(videoDownload);
+        var videoDownload = fs.createWriteStream(dirName);
+        ytdl("youtube.com/watch?v=" + url, {
+            quality: 'highestvideo',
+            filter: (format) => format.container === 'mp4' && format.audioEncoding === null
+        }).pipe(videoDownload);
         videoDownload.on('open', (data) => {
             console.log("Started downloading video after " + (Date.now() - time) + "ms");
         });
         videoDownload.on('close', () => {
-            console.log("Finished downloading video after " + (Date.now() - time) + "ms");
-            getFPS(dirname, callback);
+            fs.rename(dirName, dirDone, function (err) {
+                console.log("Finished downloading video after " + (Date.now() - time) + "ms");
+                getFPS(dirDone, callback);
+            });
         });
-    }
-    else {
+    } else {
         console.log("Video " + url + " was already downloaded!");
-        getFPS(dirname, callback);
+        getFPS(dirDone, callback);
     }
 }
 
@@ -216,7 +229,9 @@ function runOpenPose(dir, callback) { // OpenPoseDemo.exe --image_dir [DIRECTORY
         // "--write_images", dir,
         "--write_keypoint_json", dir,
         "--no_display"
-    ], (error, stdout, stderr) => { callback(); });
+    ], (error, stdout, stderr) => {
+        callback();
+    });
 }
 
 function extractAngles(poseDataPath) {

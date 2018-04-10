@@ -5,7 +5,7 @@
     "main": "server.js",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "start": "nodemon --ignore 'training/*.*' --ignore 'processing/' server.js"
+        "start": "nodemon --ignore 'training/*.*' --ignore 'processing/**/*' server.js"
     },
     "repository": {
         "type": "git",
@@ -18,9 +18,11 @@
     },
     "homepage": "https://github.com/Yoga-Masters/Training-Data-Amassing-Server#readme",
     "dependencies": {
-        "express": "^4.16.3",
         "cors": "^2.8.4",
+        "express": "^4.16.3",
         "firebase-admin": "^5.11.0",
-        "youtube-video-to-frames": "^1.0.2"
+        "node": "^9.11.0",
+        "youtube-video-to-frames": "^1.0.2",
+        "ytdl-core": "^0.20.2"
     }
 }
