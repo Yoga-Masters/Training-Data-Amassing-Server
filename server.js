@@ -208,15 +208,19 @@ function downloadYoutubeVideo(url, folder, callback) { // Check if a video is do
             filter: (format) => format.container === 'mp4' && format.audioEncoding === null
         }).pipe(videoDownload);
         videoDownload.on('open', (data) => {
-            console.log("Started downloading video after " + (Date.now() - time) + "ms");
+            console.log("Started downloading video " + url + " after " + (Date.now() - time) + "ms");
         });
-        videoDownload.on('close', () => {
-            fs.rename(dirName, dirDone, function (err) {
-                console.log("Finished downloading video after " + (Date.now() - time) + "ms");
+        videoDownload.on('error', (data) => {
+            console.log("Video " + url + " FAILED TO DOWNLOAD after " + (Date.now() - time) + "ms");
+        });
+        videoDownload.on('finish', () => {
+            fs.rename(dirName, dirDone, function(err) {
+                console.log("Finished downloading video " + url + " after " + (Date.now() - time) + "ms");
                 getFPS(dirDone, callback);
             });
         });
-    } else {
+    }
+    else {
         console.log("Video " + url + " was already downloaded!");
         getFPS(dirDone, callback);
     }
