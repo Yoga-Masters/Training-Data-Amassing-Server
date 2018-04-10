@@ -119,7 +119,7 @@ function handleTrainingDataPost(body) { // Download a video, convert it to frame
                 (body["endTimeStampMin" + i] * 60 + body["endTimeStampSec" + i]) * fps
             ]);
         }
-        convertToFrames(framesDict, videoID, framesFolder, fps);
+        convertToFrames(framesDict, videoID, framesFolder, fps, Date.now());
     });
 }
 
@@ -147,7 +147,7 @@ function checkFramesComplete(check, pose, video, folder) {
     });
 }
 
-function convertToFrames(framesDict, id, folder, fps) { // ffmpeg -i video.mp4 -vf select='eq(n\,30)+eq(n\,31)' -vsync 0 frames+"selectedPose"+%d.jpg
+function convertToFrames(framesDict, id, folder, fps, time) { // ffmpeg -i video.mp4 -vf select='eq(n\,30)+eq(n\,31)' -vsync 0 frames+"selectedPose"+%d.jpg
     var framesList = "";
     var completion = {};
     for (const pose of Object.keys(framesDict)) completion[pose] = false;
@@ -168,7 +168,8 @@ function convertToFrames(framesDict, id, folder, fps) { // ffmpeg -i video.mp4 -
             '-vsync', '0', "./processing/videos/" + id + "/" + folder + "/" + pose + "%d.jpg"
         ], (error, stdout, stderr) => {
             completion[pose] = true;
-            checkFramesComplete(completion, pose, id, folder);
+            console.log("Finished " + pose + " pose for " + id + " @ " + folder + " in " + (Date.now() - time) + "ms!");
+            // checkFramesComplete(completion, pose, id, folder);
         });
         framesList = "";
     }
@@ -182,7 +183,7 @@ function getFPS(path, callback) { // ffprobe -v 0 -of csv=p=0 -select_streams 0 
         'stream=r_frame_rate', path
     ], (error, stdout, stderr) => {
         console.log("FPS is " + stdout);
-        callback(parseInt(stdout.substring(0, stdout.indexOf("/"))) / parseInt(stdout.substring(stdout.indexOf("/") + 1)));
+        callback(Math.round(parseInt(stdout.substring(0, stdout.indexOf("/"))) / parseInt(stdout.substring(stdout.indexOf("/") + 1))));
     });
 }
 
