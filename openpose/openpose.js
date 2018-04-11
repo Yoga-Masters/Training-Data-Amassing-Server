@@ -1,20 +1,111 @@
 var fs = require('fs');
 var gm = require('gm');
+var path = require('path');
 
+/*
+Arguments
+"node openpose.js [arguments]"
+
+-write_images : Decides to write images with keypoint data on it.
+
+Input : Image(s) in directory same level with openpose.js named input
+Output: If -write_images is on, will write an image with keypoints labeled on it in output directory
+        Also writes JSON file with keypoints in it in output directory.
+*/
 function main() {
+    //Runs openpose on a whole directory
+    runOpenPose("./input/", "./output/");
+    //Loops over every image in directory
+    fs.readdir('./input/', 'utf-8', function(err, files) {
+        if (err) {
+            console.log('Error: Directory not found.');
+            process.exit(1);
+        }
+
+        files.forEach(function(file, index) {
+            //calculate angle
+            var filename = './output/' + file.slice(0, -4) + '_keypoints.json';
+            var openposeData = JSON.parse(fs.readFileSync(filename, 'utf8')).people[0].pose_keypoints;;
+            var poseData = extractAngles(filename);
+
+            console.log("Pose data for: " + file);
+            console.log(poseData);
+            //console.log(openposeData);
+
+            //crop
+
+            //get coords
+            var upper  = 1000000;
+            var lower = 0;
+            var left   = 1000000;
+            var right  = 0;
+
+            for (var i=0; i < openposeData.length; i++) {
+                value = openposeData[i];
+                if ((i+3) % 3 === 0) {
+                    if (value < left & value != 0)
+                        left = value;
+                    if (value > right & value != 0)
+                        right = value;
+                }
+                if ((i+3) % 3 === 1) {
+                    if (value < upper & value != 0)
+                        upper = value;
+                    if (value > lower & value != 0)
+                        lower = value;
+                }
+            }
+
+            upper = Math.round(upper);
+            lower = Math.round(lower);
+            left  = Math.round(left);
+            right = Math.round( right);
+
+            height = lower - upper;
+            width = right - left;
+
+            // console.log(upper);
+            // console.log(lower);
+            // console.log(left);
+            // console.log(right);
+
+            console.log('Pose is ' + height + ' tall and ' + width + ' wide.');
+            console.log();
+
+            // pad image to square
+            if (height > width) {
+
+            }
+
+
+
+
+            //find which is longer, vertical or horizontal
+            //pad the shorter size until image is square
+
+            //console.log(file.slice(0, -4) + '_cropped.jpg saved.');
+            //resize
+            //console.log(file.slice(0, -4) + '_resized.jpg saved.');
+            //grayscale
+            //console.log(file.slice(0, -4) + '_grayscale.jpg saved.');
+        });
+    });
+    
+
+
+
+
+    /*
     // Get first image's path
     var imagePath = "";
     var imageName = "";
-    fs.readdirSync('./examples').forEach(file => {
+    fs.readdirSync('./input').forEach(file => {
         var path = require('path');
         if (path.extname(file) == '.jpg' || path.extname(file) == '.png')
             imagePath = file;
     });
 
     imageName += imagePath.slice(0, -4);
-
-    // Run openpose
-    //runOpenPose("./examples/", "./output/");
 
     jsonPath = "./output/" + imageName + "_keypoints.json";
     var poseData = extractAngles(jsonPath);
@@ -28,11 +119,19 @@ function main() {
 
     gm('./examples/imagePath')
         .resizeExact(100, 100)
-        .write('./examples/imageName' + '_gray.jpg', function(err) {
+        .write('./input/imageName' + '_gray.jpg', function (err) {
             if (!err) console.log('done');
-        });
+    });
+    */
+    
+
 }
 
+// Check flags
+function checkFlag(argument) {
+    var args =process.argv.slice(2);
+    return (args.indexOf(argument) > -1);
+}
 
 /*
 Main command:./OpenPoseDemo.exe
@@ -43,13 +142,27 @@ Arguments:  --image_dir [DIRECTORY]
 */
 function runOpenPose(inputDir, outputDir) {
     console.log("Running OpenPose on " + inputDir)
-    'use strict';
-    const { spawnSync } = require('child_process'),
-        ls = spawnSync('./openPoseDemo.exe', ['--image_dir', inputDir,
-            '--write_keypoint_json', outputDir,
-            '--no_display'
-        ]);
-    console.log('Done');
+    if (checkFlag("-write_images")) {
+        console.log("write_images true");
+        'use strict';
+        const
+            { spawnSync } = require( 'child_process' ),
+            ls = spawnSync( './openPoseDemo.exe', [ '--image_dir', inputDir,
+                                                    '--write_keypoint_json', outputDir,
+                                                    '--write_images', outputDir,
+                                                    '--no_display'
+                                                    ]);
+    }
+    else {
+        'use strict';
+        const
+            { spawnSync } = require( 'child_process' ),
+            ls = spawnSync( './openPoseDemo.exe', [ '--image_dir', inputDir,
+                                                    '--write_keypoint_json', outputDir,
+                                                    '--no_display'
+                                                    ]);
+    }
+    console.log('Openpose complete.');
 }
 
 
@@ -103,40 +216,47 @@ function extractAngles(poseDataPath) {
     ...
     */
 
-    var neck = getAngle(keypoints[3], keypoints[4], keypoints[0], keypoints[1]);
-    var l_shoulder = getAngle(keypoints[3], keypoints[4], keypoints[15], keypoints[16]);
-    var r_shoulder = getAngle(keypoints[3], keypoints[4], keypoints[6], keypoints[7]);
-    var l_arm = getAngle(keypoints[15], keypoints[16], keypoints[18], keypoints[19]);
-    var r_arm = getAngle(keypoints[6], keypoints[7], keypoints[9], keypoints[10]);
-    var l_farm = getAngle(keypoints[18], keypoints[19], keypoints[21], keypoints[22]);
-    var r_farm = getAngle(keypoints[9], keypoints[10], keypoints[12], keypoints[13]);
-    var l_spine = getAngle(keypoints[3], keypoints[4], keypoints[33], keypoints[34]);
-    var r_spine = getAngle(keypoints[3], keypoints[4], keypoints[24], keypoints[25]);
-    var l_thigh = getAngle(keypoints[33], keypoints[34], keypoints[36], keypoints[37]);
-    var r_thigh = getAngle(keypoints[24], keypoints[25], keypoints[27], keypoints[28]);
-    var l_leg = getAngle(keypoints[36], keypoints[37], keypoints[39], keypoints[40]);
-    var r_leg = getAngle(keypoints[27], keypoints[28], keypoints[30], keypoints[31]);
+    var neck =          getAngle(keypoints[3],  keypoints[4],  keypoints[0],  keypoints[1]);
+    var l_shoulder =    getAngle(keypoints[3],  keypoints[4],  keypoints[15], keypoints[16]);
+    var r_shoulder =    getAngle(keypoints[3],  keypoints[4],  keypoints[6],  keypoints[7]);
+    var l_arm =         getAngle(keypoints[15], keypoints[16], keypoints[18], keypoints[19]);
+    var r_arm =         getAngle(keypoints[6],  keypoints[7],  keypoints[9],  keypoints[10]);
+    var l_farm =        getAngle(keypoints[18], keypoints[19], keypoints[21], keypoints[22]);
+    var r_farm =        getAngle(keypoints[9],  keypoints[10], keypoints[12], keypoints[13]);
+    var l_spine =       getAngle(keypoints[3],  keypoints[4],  keypoints[33], keypoints[34]);
+    var r_spine =       getAngle(keypoints[3],  keypoints[4],  keypoints[24], keypoints[25]);
+    var l_thigh =       getAngle(keypoints[33], keypoints[34], keypoints[36], keypoints[37]);
+    var r_thigh =       getAngle(keypoints[24], keypoints[25], keypoints[27], keypoints[28]);
+    var l_leg =         getAngle(keypoints[36], keypoints[37], keypoints[39], keypoints[40]);
+    var r_leg =         getAngle(keypoints[27], keypoints[28], keypoints[30], keypoints[31]);
 
     var output = [neck,
-        l_shoulder,
-        r_shoulder,
-        l_arm,
-        r_arm,
-        l_farm,
-        r_farm,
-        l_spine,
-        r_spine,
-        l_thigh,
-        r_thigh,
-        l_leg,
-        r_leg
-    ];
+                  l_shoulder,
+                  r_shoulder,
+                  l_arm,
+                  r_arm,
+                  l_farm,
+                  r_farm,
+                  l_spine,
+                  r_spine,
+                  l_thigh,
+                  r_thigh,
+                  l_leg,
+                  r_leg];
+
+    for (var i=0; i<output.length; i++)
+        output[i] = Math.round(output[i]);
     return output;
+}
+
+function extractAnglesAlt(poseDataPath) {
+
 }
 
 
 /*
-Returns an angle between two points. Angle is determined as the following:
+Returns an angle between two points relative to a straight line going up.
+Angle is determined as the following:
 
 Degree  Shape (points 1 and 2)
 -------------
@@ -144,11 +264,11 @@ Degree  Shape (points 1 and 2)
 0       |
         1
 -------------
-          2
-30       /
+        | 2
+30      |/
         1
 -------------
-
+        |
 90      1--2
 
 -------------
@@ -156,7 +276,7 @@ Degree  Shape (points 1 and 2)
 180     |
         2
 -------------
-        
+        |
 270  2--1
 
 -------------
@@ -173,6 +293,17 @@ function getAngle(x1, y1, x2, y2) {
     return 360 - angle;
 }
 
+
+
+// Alternate function to get angles.
+// The angle between limbs like the inside of your arm
+function getAngleAlt(x1, y1, x2, y2, x3, y3) {
+    var vectorX = 0;
+    var vectorY = 0;
+
+
+}
+
 function radiansToDegrees(radians) {
     return (radians * 180 / Math.PI);
 }
@@ -184,3 +315,4 @@ function degreesToRadians(degrees) {
 
 // Execute
 main();
+
