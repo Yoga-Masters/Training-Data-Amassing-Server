@@ -2,6 +2,7 @@
 var size = 100;
 var maxFPS = 30;
 const fs = require('fs');
+const jimp = require("jimp");
 const http = require('http');
 const path = require('path');
 const cors = require('cors');
@@ -9,9 +10,11 @@ const crypto = require("crypto");
 const ytdl = require('ytdl-core');
 const express = require('express');
 const admin = require("firebase-admin");
+const base64Img = require('base64-img');
 const bodyParser = require("body-parser");
 const exec = require('child_process').execFile;
 // =============================== APP SETUP ===================================
+const background;
 const app = express();
 const server = http.createServer(app);
 app.use(bodyParser.urlencoded({
@@ -21,6 +24,34 @@ app.use(bodyParser.json());
 app.use(cors());
 app.use(express.static(path.resolve(__dirname, 'client')));
 server.listen(process.env.PORT || 3000, process.env.IP || "0.0.0.0", () => console.log("Youtube Downloader listening at", server.address().address + ":" + server.address().port));
+jimp.read("background.jpg", (err, image) => { background = image; });
+
+// jimp.read("background.jpg", function(err, background) {
+//     if (err) throw err;
+//     Jimp.read("lenna.png", function(err, image) {
+//         if (err) throw err;
+//         imageProcessing(background, image, -100, -100, 200, 200).write("newtest.jpg");
+//     });
+// });
+
+function imageProcessing(background, image, x1, y1, x2, y2) {
+    var x, y;
+    // x1 > 0 && y1 > 0 ? image.bitmap.width - x1 : Math.abs(x1)
+    // x1 > 0 && y1 > 0 ? image.bitmap.height - y1 : Math.abs(y1)
+    if (x1 > 0 && y1 > 0) {
+        x = x1 - image.bitmap.width;
+        y = y1 - image.bitmap.height;
+    }
+    else {
+        x = Math.abs(x1);
+        y = Math.abs(y1);
+    }
+    return background.crop(0, 0, (x2 - x1), (y2 - y1)) // Crops the Gray to all we need it for
+        .composite(image, x, y) //Composite the image to have no Grey
+        .resize(size, size) //resize to 100 x 100
+        .quality(100) // set JPEG quality
+        .greyscale(); // greyscale
+}
 // ============================ FIREBASE SETUP =================================
 admin.initializeApp({ // Connecting to Firebase Training Database
     credential: admin.credential.cert(require("./json/yoga-master-training-db-d9acdc86dca0.json")),
@@ -139,14 +170,15 @@ function checkFramesComplete(check, pose, video, folder) {
         console.log("Finished running openPoseDemo! Reading all images in 1 by 1 now...");
         fs.readdir("./processing/videos/" + video + "/" + folder + "/", (err, files) => {
             files.forEach(file => {
-                if (path.extname(file) != '.jpg') return;
-                file = file.slice(0, -4);
+                if (path.extname(file) != '.json') return;
+                file = file.slice(0, -("_keypoints.json".length));
+
                 var openPoseAngles = extractAngles("./processing/videos/" + video + "/" + folder + "/" + file + "_keypoints.json");
                 tdb.ref("frames/" + video + "-" + folder + "-" + file).set({
                     "angles": openPoseAngles,
                     "pose": pose,
-                    "trainingFrame": "", // <- BASE 64 OF 100x100 grayscaled and cropped training images
-                    "openPoseFrame": "", // <- BASE 64 OF 100x100 cropped openpose output images
+                    "trainingFrame": base64Img.base64Sync("FinalTrainingImage"), // <- BASE 64 OF 100x100 grayscaled and cropped training images
+                    "openPoseFrame": base64Img.base64Sync("FinalOpenPoseImage"), // <- BASE 64 OF 100x100 cropped openpose output images
                 });
             });
         });
