@@ -121,8 +121,8 @@ function handleTrainingDataPost(body) { // Download a video, convert it to frame
             var pose = body["selectedPose" + i];
             if (framesDict[pose] === undefined) framesDict[pose] = [];
             framesDict[pose].push([
-                (body["startTimeStampMin" + i] * 60 + body["startTimeStampSec" + i]) * fps,
-                (body["endTimeStampMin" + i] * 60 + body["endTimeStampSec" + i]) * fps
+                (parseInt(body["startTimeStampMin" + i]) * 60 + parseInt(body["startTimeStampSec" + i])) * fps,
+                (parseInt(body["endTimeStampMin" + i]) * 60 + parseInt(body["endTimeStampSec" + i])) * fps
             ]);
         }
         convertToFrames(framesDict, videoID, framesFolder, fps, Date.now());
@@ -164,9 +164,7 @@ function convertToFrames(framesDict, id, folder, fps, time) { // ffmpeg -i video
     console.log("framesDict: " + JSON.stringify(framesDict));
     ensureDirectoryExistence("./processing/videos/" + id + "/" + folder + "/1.jpg");
     for (const pose of Object.keys(framesDict)) {
-        framesDict[pose].forEach(frame => {
-            for (var i = frame[0]; i <= frame[1]; i += (fps / maxFPS)) framesList = framesList + "eq(n\\," + i + ")+"
-        });
+        framesDict[pose].forEach(frame => { for (var i = frame[0]; i <= frame[1]; i += (fps / maxFPS)) framesList = framesList + "eq(n\\," + i + ")+"; });
         framesList = framesList.slice(0, -1);
         console.log("Putting framesList frames for " + pose + " into " + id + "/" + folder);
         console.log("framesList: " + framesList);
