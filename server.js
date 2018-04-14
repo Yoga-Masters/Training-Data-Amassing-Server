@@ -340,9 +340,9 @@ function ensureDirectoryExistence(filePath) {
 }
 
 function delFrame(video, folder, file) { //TODO: FIX FOR ALL THREE FILES
-    delFile("./processing/videos/" + video + "/" + folder + "/" + file + ".jpg");
-    // delFile("./processing/videos/" + video + "/" + folder + "/" + file + ".jpg");
-    // delFile("./processing/videos/" + video + "/" + folder + "/" + file + "_keypoints.json");
+    delFile("./processing/videos/" + video + "/" + folder + "/" + file + ".jpg", () => {});
+    // delFile("./processing/videos/" + video + "/" + folder + "/" + file + ".jpg", () => {});
+    // delFile("./processing/videos/" + video + "/" + folder + "/" + file + "_keypoints.json", () => {});
 }
 
 function delFile(path, cb) {
