@@ -98,6 +98,11 @@ app.get('/api/getpost', (req, res) => {
     handleTrainingDataPost(req.query);
     res.send({ "processing": req.query });
 });
+app.get('/api/deleteKey/:key', (req, res) => {
+    tdb.ref("frames/" + req.params.key).set(null, () => {
+        res.send({ "return": "Deleted key " + req.params.key + " data!" });
+    });
+});
 app.get('/api/delete', (req, res) => {
     rimraf('./processing', function() {
         console.log("Cleared the processing folder...");

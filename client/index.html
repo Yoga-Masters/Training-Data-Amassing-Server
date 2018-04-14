@@ -57,6 +57,7 @@
             storageBucket: "yoga-master-training-db.appspot.com",
             messagingSenderId: "743195328789"
         });
+        var client = new HttpClient();
         var tdb = firebase.database();
         var time = 0;
         tdb.ref("lastUpdated").on("value", function(snapshot) {
@@ -87,8 +88,11 @@
             });
         }
         function delData(key) {
-            console.log("Deleting Training Data "+key+"...");
-            tdb.ref("frames/"+key).set(null);
+            // console.log("Deleting Training Data "+key+"...");
+            // tdb.ref("frames/"+key).set(null);
+            client.get("/api/deleteKey/"+key, function(response) {
+                console.log(response);
+            });
         }
         var count = 1;
         function addFields() { //code for adding the next three fields again
