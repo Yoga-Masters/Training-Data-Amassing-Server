@@ -63,3 +63,4 @@ training/
 
 # Specific JSON Private Keys
 json/
+training_angles.csv

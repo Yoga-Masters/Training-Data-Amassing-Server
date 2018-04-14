@@ -9,13 +9,22 @@
             text-align: center;
         }
 
-        input {
+        form input {
             width: 19%;
             /*min-width: 150px;*/
         }
 
         select {
             width: 19%;
+        }
+        
+        table, th, td {
+            border: 1px solid black;
+        }
+        
+        .tf {
+            width: 100px;
+            height: 100px;
         }
     </style>
 </head>
@@ -27,19 +36,61 @@
         <input name="url" placeholder="YouTube Link 1" required>
         <br>
         <div id="add"></div>
-        <input type="submit" value="Submit"> </form>
+        <input type="submit" value="Submit">
+    </form>
+    <hr>
+    <a href="/training_angles.csv" download="training_angles.csv"><input type="button" value="Download latest training_angles as CSV"/></a>
+    <p id="lastUpdated"></p>
+    <hr>
+    <input type="button" value="Show Firebase Training Data" onclick="showData();" />
+    <input id="maxCount" type="number" value="100" step="1" min="0" />
+    <br><br>
+    <table style="width:100%" id="tdb"><tr><th>pose</th><th>trainingFrame</th><th>openposeFrame</th><th>angles</th><th>key</th></tr></table>
+    <script src="https://www.gstatic.com/firebasejs/4.12.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/4.12.1/firebase-database.js"></script>
     <script type="text/javascript">
+        firebase.initializeApp({
+            apiKey: "AIzaSyBfzO0wkhLUX0sSKeQi1d7uMvvJrf7Ti4s",
+            authDomain: "yoga-master-training-db.firebaseapp.com",
+            databaseURL: "https://yoga-master-training-db.firebaseio.com",
+            projectId: "yoga-master-training-db",
+            storageBucket: "yoga-master-training-db.appspot.com",
+            messagingSenderId: "743195328789"
+        });
+        var tdb = firebase.database();
+        var time = 0;
+        tdb.ref("lastUpdated").on("value", function(snapshot) {
+            time = snapshot.val();
+        });
+        function updateTime() {
+            document.getElementById("lastUpdated").innerHTML = "Last updated @ "+(new Date(time)).toLocaleString()+", "+Math.round((Date.now() - time)/1000)+" seconds ago";
+        }
+        setInterval(updateTime, 1000);
+        function showData() {
+            console.log("Showing Firebase Training Data...");
+            tdb.ref("frames").on("value", function(snapshot) {
+                var count = 1;
+                var time = Date.now();
+                var data = Object.values(snapshot.val()).sort((o1, o2) => o2.timestamp - o1.timestamp);
+                var table = document.getElementById("tdb");
+                // var max = document.getElementById("maxCount").value;
+                // console.log(max);
+                table.innerHTML = "<tr><th>pose</th><th>trainingFrame</th><th>openposeFrame</th><th>angles</th><th>key</th></tr>";
+                for (const frame of data) {
+                    var row = document.createElement("tr");
+                    row.innerHTML = "<td>"+frame.pose+"</td><td class='tf'><img src='"+frame.trainingFrame+"'></td><td class='tf'><img src='"+frame.openposeFrame+"'></td><td>"+JSON.stringify(frame.angles)+"</td><td class='deleteBtn'><a onclick='delData(\""+frame.key+"\");' href='javascript:void(0);'>Delete "+frame.key+"</a></td>";//<input type='button' value='Delete "+frame.key+"' onclick='delData(\""+frame.key+"\");'/></td>";
+                    table.appendChild(row);
+                    console.log("Writing row "+count+", key "+frame.key+" after "+(Date.now() - time)+"ms.");
+                    count++;
+                }
+                // if(max + 1 >= count) return;
+            });
+        }
+        function delData(key) {
+            console.log("Deleting Training Data "+key+"...");
+        }
         var count = 1;
-
-        function addFields() {
-            //code for adding the next three fields again
-            // var newLink = document.createElement('input');
-            // newLink.type = "text";
-            // newLink.name = "url"+count;
-            // newLink.id = "newUrl"+count;
-            // newLink.placeholder = "YouTube Link " + count;
-            // var name = "test"+(count-1);
-            // document.getElementById(name).appendChild(newLink);
+        function addFields() { //code for adding the next three fields again
             var newStartMin = document.createElement('input');
             newStartMin.setAttribute("placeholder", "TimeStamp Minute Start " + count);
             newStartMin.setAttribute("name", "startTimeStampMin" + count);

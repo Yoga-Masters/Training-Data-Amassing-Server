@@ -1,6 +1,7 @@
 // ============================= GLOBALS SETUP =================================
 var size = 100;
-var maxFPS = 30;
+var maxFPS = 1;
+var bgSize = 1280;
 const fs = require('fs');
 const jimp = require("jimp");
 const http = require('http');
@@ -10,63 +11,29 @@ const crypto = require("crypto");
 const ytdl = require('ytdl-core');
 const express = require('express');
 const admin = require("firebase-admin");
-const base64Img = require('base64-img');
 const bodyParser = require("body-parser");
+const stringify = require('csv-stringify');
 const exec = require('child_process').execFile;
 // =============================== APP SETUP ===================================
-const background;
+var background;
 const app = express();
 const server = http.createServer(app);
-app.use(bodyParser.urlencoded({
-    extended: false
-}));
+app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(cors());
 app.use(express.static(path.resolve(__dirname, 'client')));
 server.listen(process.env.PORT || 3000, process.env.IP || "0.0.0.0", () => console.log("Youtube Downloader listening at", server.address().address + ":" + server.address().port));
-jimp.read("background.jpg", (err, image) => { background = image; });
-
-// jimp.read("background.jpg", function(err, background) {
-//     if (err) throw err;
-//     Jimp.read("lenna.png", function(err, image) {
-//         if (err) throw err;
-//         imageProcessing(background, image, -100, -100, 200, 200).write("newtest.jpg");
-//     });
-// });
-
-function imageProcessing(background, image, x1, y1, x2, y2) {
-    var x, y;
-    // x1 > 0 && y1 > 0 ? image.bitmap.width - x1 : Math.abs(x1)
-    // x1 > 0 && y1 > 0 ? image.bitmap.height - y1 : Math.abs(y1)
-    if (x1 > 0 && y1 > 0) {
-        x = x1 - image.bitmap.width;
-        y = y1 - image.bitmap.height;
-    }
-    else {
-        x = Math.abs(x1);
-        y = Math.abs(y1);
-    }
-    return background.crop(0, 0, (x2 - x1), (y2 - y1)) // Crops the Gray to all we need it for
-        .composite(image, x, y) //Composite the image to have no Grey
-        .resize(size, size) //resize to 100 x 100
-        .quality(100) // set JPEG quality
-        .greyscale(); // greyscale
-}
 // ============================ FIREBASE SETUP =================================
 admin.initializeApp({ // Connecting to Firebase Training Database
     credential: admin.credential.cert(require("./json/yoga-master-training-db-d9acdc86dca0.json")),
-    databaseURL: "https://yoga-master-training-db.firebaseio.com",
-    storageBucket: "yoga-master-training-db.appspot.com/"
-});
+    databaseURL: "https://yoga-master-training-db.firebaseio.com"
+}); // , storageBucket: "yoga-master-training-db.appspot.com/"
 var appAdmin = admin.initializeApp({ // Connecting to Firebase App Database
     credential: admin.credential.cert(require("./json/yoga-master-app-774bc242a8b4.json")),
-    databaseURL: "https://yoga-master-app.firebaseio.com",
-    storageBucket: "yoga-master-app.appspot.com"
-}, "app");
+    databaseURL: "https://yoga-master-app.firebaseio.com"
+}, "app"); // , storageBucket: "yoga-master-app.appspot.com"
 console.log("Connected to training data firebase as \"" + admin.app().name + "\"");
 console.log("Connected to yogamaster app firebase as \"" + appAdmin.name + "\"");
-var tauth = admin.auth();
-var aauth = appAdmin.auth();
 var tdb = admin.database();
 var adb = appAdmin.database();
 // ~~~~ CLOUD STORAGE EXPERIMENTATION : FAILURE ~~~~
@@ -90,25 +57,46 @@ var adb = appAdmin.database();
 //     });
 // });
 // ========================= PASSIVE FIREBASE FUNCTIONS ========================
-tdb.ref("frames").on("value", snap => {
-    for (const key of Object.keys(snap.val())) {
-        if (!snap.val()[key].hasOwnProperty("download") || snap.val()[key].download) {
-            var time = Date.now();
-            ensureDirectoryExistence("./training/key.json");
-            fs.writeFile("./training/" + key + ".json", JSON.stringify(snap.val()[key]), 'utf8');
-            console.log("Wrote new " + snap.val()[key].pose + " pose frame " + (Date.now() - time) + "ms ago! Check it out @: " + snap.val()[key].originalFrameLink);
-        }
-    }
-});
-
-tdb.ref("latestFrame").on("value", snap => { // MAY MOVE TO FB CLOUD FUNCTIONS
-    var ext = snap.val().split(';')[0].match(/jpeg|png|gif|jpg|webp/)[0];
+tdb.ref("backgroundSize").on("value", snap => {
     var time = Date.now();
-    ensureDirectoryExistence("./processing/pictures/frame.png");
-    fs.writeFile("./processing/pictures/latestFrame." + ext, snap.val().replace(/^data:image\/\w+;base64,/, ""), 'base64', err => {
-        console.log("Saved new frame in " + (Date.now() - time) + "ms to processing/pictures/latestFrame." + ext + "...");
+    bgSize = snap.val();
+    jimp.read("background.jpg", (err, image) => {
+        background = image.crop(0, 0, bgSize, bgSize);
+        console.log("bgSize got updated to: " + bgSize + "px in " + (Date.now() - time) + "ms; Updating background...");
     });
 });
+
+tdb.ref("frames").on("value", snap => {
+    ensureDirectoryExistence("./client/training_angles.csv");
+    var data = snap.val();
+    var time = Date.now();
+    var trainingData = [];
+    var poseIndex = { "warriorii": 0, "tree": 1, "triangle": 2 };
+    for (const key of Object.keys(data)) {
+        // if (!snap.val()[key].hasOwnProperty("download") || snap.val()[key].download) {
+        //JSON.stringify(snap.val()[key])
+        // console.log("Wrote new " + +" pose frame " + (Date.now() - time) + "ms ago! Check it out @: " + snap.val()[key].originalFrameLink);
+        // }
+        data[key].angles.push(poseIndex[data[key].pose]);
+        trainingData.push(data[key].angles);
+    }
+    stringify(trainingData, function(err, output) {
+        output = trainingData.length + "," + (trainingData[0].length - 1) + ",warriorii,tree,triangle\n" + output;
+        fs.writeFile("./client/training_angles.csv", output, 'utf8', (err) => {
+            tdb.ref("lastUpdated").set(Date.now());
+            console.log("Wrote new Training Data from scratch in " + (Date.now() - time) + "ms! Check it out @: " + server.address().address + ":" + server.address().port + "/training_angles.csv");
+        });
+    });
+});
+
+// tdb.ref("latestFrame").on("value", snap => { // MAY MOVE TO FB CLOUD FUNCTIONS
+//     var ext = snap.val().split(';')[0].match(/jpeg|png|gif|jpg|webp/)[0];
+//     var time = Date.now();
+//     ensureDirectoryExistence("./processing/pictures/frame.png");
+//     fs.writeFile("./processing/pictures/latestFrame." + ext, snap.val().replace(/^data:image\/\w+;base64,/, ""), 'base64', err => {
+//         console.log("Saved new frame in " + (Date.now() - time) + "ms to processing/pictures/latestFrame." + ext + "...");
+//     });
+// });
 
 adb.ref("size").on("value", snap => {
     size = snap.val();
@@ -172,14 +160,19 @@ function checkFramesComplete(check, pose, video, folder) {
             files.forEach(file => {
                 if (path.extname(file) != '.json') return;
                 file = file.slice(0, -("_keypoints.json".length));
-
-                var openPoseAngles = extractAngles("./processing/videos/" + video + "/" + folder + "/" + file + "_keypoints.json");
-                tdb.ref("frames/" + video + "-" + folder + "-" + file).set({
-                    "angles": openPoseAngles,
-                    "pose": pose,
-                    "trainingFrame": base64Img.base64Sync("FinalTrainingImage"), // <- BASE 64 OF 100x100 grayscaled and cropped training images
-                    "openPoseFrame": base64Img.base64Sync("FinalOpenPoseImage"), // <- BASE 64 OF 100x100 cropped openpose output images
-                });
+                var openPoseData = extractAngles("./processing/videos/" + video + "/" + folder + "/" + file + "_keypoints.json");
+                imageProcessing("./processing/videos/" + video + "/" + folder + "/" + file + ".jpg",
+                    openPoseData[1][0], openPoseData[1][1], openPoseData[1][2], openPoseData[1][3], (image) => {
+                        // image.write("newtest.jpg");
+                        tdb.ref("frames/" + video + "-" + folder + "-" + file).set({
+                            "timestamp": Date.now(),
+                            "key": video + "-" + folder + "-" + file,
+                            "angles": openPoseData[0],
+                            "pose": pose,
+                            "trainingFrame": image, // <- BASE 64 OF 100x100 grayscaled and cropped training images
+                            // "openPoseFrame": base64Img.base64Sync("FinalOpenPoseImage"), // <- BASE 64 OF 100x100 cropped openpose output images
+                        });
+                    });
             });
         });
     });
@@ -257,6 +250,40 @@ function downloadYoutubeVideo(url, folder, callback) { // Check if a video is do
 }
 
 // ==================== OPENPOSE + IMG PROCESSING FUNCTIONS ====================
+function imageProcessing(path, x1, y1, x2, y2, cb) {
+    jimp.read(path, function(err, image) {
+        var x = x1 > 0 && y1 > 0 ? image.bitmap.width - x1 : Math.abs(x1);
+        var y = x1 > 0 && y1 > 0 ? image.bitmap.height - y1 : Math.abs(y1);
+        background.crop(0, 0, (x2 - x1), (y2 - y1)) // Crops the Gray to all we need it for
+            .composite(image, x, y) //Composite the image to have no Grey
+            .resize(size, size) //resize to 100 x 100
+            .quality(100) // set JPEG quality
+            .greyscale() // greyscale
+            .getBase64(jimp.MIME_JPEG, cb); // return image as base64 in passed in callback
+    });
+}
+
+function extractAngles(poseDataPath) {
+    var keypoints = JSON.parse(fs.readFileSync(poseDataPath, 'utf8')).people[0].pose_keypoints; // Read JSON file, Extract pose data from an array of 54 numbers
+    return [
+        [getAngle(keypoints[3], keypoints[4], keypoints[0], keypoints[1]),
+            getAngle(keypoints[3], keypoints[4], keypoints[15], keypoints[16]),
+            getAngle(keypoints[3], keypoints[4], keypoints[6], keypoints[7]),
+            getAngle(keypoints[15], keypoints[16], keypoints[18], keypoints[19]),
+            getAngle(keypoints[6], keypoints[7], keypoints[9], keypoints[10]),
+            getAngle(keypoints[18], keypoints[19], keypoints[21], keypoints[22]),
+            getAngle(keypoints[9], keypoints[10], keypoints[12], keypoints[13]),
+            getAngle(keypoints[3], keypoints[4], keypoints[33], keypoints[34]),
+            getAngle(keypoints[3], keypoints[4], keypoints[24], keypoints[25]),
+            getAngle(keypoints[33], keypoints[34], keypoints[36], keypoints[37]),
+            getAngle(keypoints[24], keypoints[25], keypoints[27], keypoints[28]),
+            getAngle(keypoints[36], keypoints[37], keypoints[39], keypoints[40]),
+            getAngle(keypoints[27], keypoints[28], keypoints[30], keypoints[31])
+        ],
+        [100, 100, 200, 200]
+    ];
+}
+
 function runOpenPose(dir, callback) { // OpenPoseDemo.exe --image_dir [DIRECTORY] --write_images [DIRECTORY] --write_keypoint_json [DIRECTORY] --no_display
     console.log("Running openPoseDemo on \"" + dir + "\"...");
     exec("openPoseDemo", ["--image_dir", dir,
@@ -266,24 +293,6 @@ function runOpenPose(dir, callback) { // OpenPoseDemo.exe --image_dir [DIRECTORY
     ], (error, stdout, stderr) => {
         callback();
     });
-}
-
-function extractAngles(poseDataPath) {
-    var keypoints = JSON.parse(fs.readFileSync(poseDataPath, 'utf8')).people[0].pose_keypoints; // Read JSON file, Extract pose data from an array of 54 numbers
-    return [getAngle(keypoints[3], keypoints[4], keypoints[0], keypoints[1]),
-        getAngle(keypoints[3], keypoints[4], keypoints[15], keypoints[16]),
-        getAngle(keypoints[3], keypoints[4], keypoints[6], keypoints[7]),
-        getAngle(keypoints[15], keypoints[16], keypoints[18], keypoints[19]),
-        getAngle(keypoints[6], keypoints[7], keypoints[9], keypoints[10]),
-        getAngle(keypoints[18], keypoints[19], keypoints[21], keypoints[22]),
-        getAngle(keypoints[9], keypoints[10], keypoints[12], keypoints[13]),
-        getAngle(keypoints[3], keypoints[4], keypoints[33], keypoints[34]),
-        getAngle(keypoints[3], keypoints[4], keypoints[24], keypoints[25]),
-        getAngle(keypoints[33], keypoints[34], keypoints[36], keypoints[37]),
-        getAngle(keypoints[24], keypoints[25], keypoints[27], keypoints[28]),
-        getAngle(keypoints[36], keypoints[37], keypoints[39], keypoints[40]),
-        getAngle(keypoints[27], keypoints[28], keypoints[30], keypoints[31])
-    ];
 }
 // ========================== HELPER FUNCTIONS ==========================
 function getRandomKey(len) {
