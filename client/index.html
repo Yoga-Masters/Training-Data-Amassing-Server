@@ -39,7 +39,7 @@
         <input type="submit" value="Submit">
     </form>
     <hr>
-    <a href="/training_angles.csv" download="training_angles.csv"><input type="button" value="Download latest training_angles as CSV"/></a>
+    <a href="/training_angles.csv" download="training_angles.csv"><input type="button" value="Download the latest Training Angles as a CSV"/></a>
     <p id="lastUpdated"></p>
     <hr>
     <input type="button" value="Show Firebase Training Data" onclick="showData();" />
@@ -88,6 +88,7 @@
         }
         function delData(key) {
             console.log("Deleting Training Data "+key+"...");
+            tdb.ref("frames/"+key).set(null);
         }
         var count = 1;
         function addFields() { //code for adding the next three fields again
