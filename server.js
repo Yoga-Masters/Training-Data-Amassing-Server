@@ -15,14 +15,15 @@ const lineReader = require('line-reader');
 const bodyParser = require("body-parser");
 const stringify = require('csv-stringify');
 const exec = require('child_process').execFile;
-const app = express();
-const server = http.createServer(app);
+const removeDirectories = require('remove-empty-directories');
 // ============================= GLOBALS SETUP =================================
-var background;
-jimp.read("background.jpg", (err, image) => { background = image; });
 var size = 100;
 var maxFPS = 1;
+var background;
 var delAftr = false;
+const app = express();
+const server = http.createServer(app);
+jimp.read("background.jpg", (err, image) => { background = image; });
 // =============================== APP SETUP ===================================
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -214,6 +215,7 @@ function uploadFrameData(video, folder, file, openPoseData, time) {
             }, (err) => {
                 console.log("Finished uploading file " + file + " data after " + (Date.now() - time) + "ms..." + (delAftr ? " Deleting it now..." : ""));
                 if (delAftr) delFrame(video, folder, file);
+                removeDirectories('./processing');
             });
         });
     });
@@ -293,7 +295,7 @@ function extractAngles(poseData) {
         getAngleAbsolute(keypoints[36], keypoints[37], keypoints[39], keypoints[40]),
         getAngleAbsolute(keypoints[27], keypoints[28], keypoints[30], keypoints[31]),
         //TODO: PUT IN RELATIVE ANGLES
-    ] : (noPerson ? 0 : 1);
+    ] : (!noPerson ? 0 : 1);
     return [angles, [450, 50, 1450, 1050]]; // TODO: FIX THIS TO CORRECT NUMBERS
 }
 
