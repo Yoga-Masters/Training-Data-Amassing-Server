@@ -19,11 +19,15 @@ const removeDirectories = require('remove-empty-directories');
 // ============================= GLOBALS SETUP =================================
 var size = 100;
 var maxFPS = 1;
+var users = [];
 var background;
 var delAftr = false;
+var started = false;
 const app = express();
 const server = http.createServer(app);
 jimp.read("background.jpg", (err, image) => { background = image; });
+ensureDirectoryExistence("./processing/pictures/frame.png");
+ensureDirectoryExistence("./processing/pictures/processed/frame.png");
 // =============================== APP SETUP ===================================
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -71,13 +75,32 @@ tdb.ref("frames").on("value", snap => {
             trainingData.push(data[key].angles);
         }
     }
-    stringify(trainingData, function(err, output) {
+    stringify(trainingData, (err, output) => {
         output = trainingData.length + "," + (trainingData[0].length - 1) + ",warriorii,tree,triangle\n" + output;
-        fs.writeFile("./client/training_angles.csv", output, 'utf8', (err) => {
+        fs.writeFile("./client/training_angles.csv", output, 'utf8', err => {
             tdb.ref("lastUpdated").set(Date.now());
             console.log("Wrote Angles only Training Data from scratch in " + (Date.now() - time) + "ms @ " + server.address().address + ":" + server.address().port + "/training_angles.csv");
-            // fsx.copy("./client/training_angles.csv", "./training/angles/training_angles.csv");
-            // fsx.copy("./client/training_angles.csv", "./training/both/training_angles.csv");
+            fsx.copy("./client/training_angles.csv", "./training/angles/training_angles.csv");
+            fsx.copy("./client/training_angles.csv", "./training/both/training_angles.csv");
+        });
+    });
+});
+adb.ref("users").on("child_added", (snap, prevChildKey) => {
+    users.push(snap.val().key);
+    adb.ref("users/" + snap.val().key + "/latestFrame").on("value", snap => {
+        var time = Date.now();
+        var data = snap.val();
+        var key = snap.ref.parent.key;
+        var ext = snap.val().split(';')[0].match(/jpeg|png|gif|jpg|webp/)[0];
+        fs.writeFile("./processing/pictures/" + key + "." + ext, data.replace(/^data:image\/\w+;base64,/, ""), 'base64', err => {
+            console.log("Saved new latestFrame from user " + key + " frame in " + (Date.now() - time) + "ms to ./processing/pictures/" + key + "." + ext + "...");
+            if (!started) {
+                console.log("STARTING APP OPENPOSE RUNNER...");
+                started = true;
+                // runOpenPose("./processing/pictures", "./processing/pictures/processed", () => {
+                //     handleAppDataUpdating(ext);
+                // });
+            }
         });
     });
 });
@@ -87,7 +110,7 @@ app.get('/api', (req, res) => res.send({
 }));
 app.post('/postapi', (req, res) => {
     handleTrainingDataPost(req.body);
-    fs.appendFile('history.txt', "\n" + JSON.stringify(req.body), function(err) {
+    fs.appendFile('history.txt', "\n" + JSON.stringify(req.body), err => {
         console.log("Got a POST: " + JSON.stringify(req.body) + "\nSaved to history.txt!");
         fsx.copy("history.txt", "./client/history.txt");
         res.redirect('/');
@@ -104,14 +127,14 @@ app.get('/api/deleteKey/:key', (req, res) => {
     });
 });
 app.get('/api/delete', (req, res) => {
-    rimraf('./processing', function() {
+    rimraf('./processing', () => {
         console.log("Cleared the processing folder...");
         res.send({ "return": "Deleted all cached training data!" });
     });
 });
 app.get('/api/redownload', (req, res) => {
     var count = 0;
-    lineReader.eachLine('history.txt', function(line, last) {
+    lineReader.eachLine('history.txt', (line, last) => {
         console.log("Started redownload of the processing folder using history.txt...");
         request.post("localhost:" + server.address().port + "/postapi").form(JSON.parse(line)); //FIX FOR ALEX'S HOME SERVER
         count++;
@@ -119,13 +142,42 @@ app.get('/api/redownload', (req, res) => {
     });
 });
 // ======================== YOUTUBE DOWNLOADER FUNCTIONS =======================
+//TODO: RUN OPENPOSE ON NEW FRAME
+//  X   AFTER FINISHING OPENPOSE, READ IN OPENPOSE JSON DATA
+//  X   PROCESS DATA AND UPLOAD ANGLES TO FIREBASE
+//  X   PROCESS LATEST IMAGE AND UPLOAD TO FIREBASE
+//  X   PROCESS OPENPOSE OUTPUT IMAGE AND UPLOAD TO FIREBASE
+//  X   UPDATE LAST UPDATED TIME
+function handleAppDataUpdating(ext) {
+    runOpenPose("./processing/pictures", "./processing/pictures/processed", () => { handleAppDataUpdating(ext); });
+    var time = Date.now();
+    for (const user of users) {
+        fs.readFile("./processing/pictures/processed/" + user + "_keypoints.json", 'utf8', (err, data) => {
+            console.log("Finished reading file " + user + " json after " + (Date.now() - time) + "ms. Processing image...");
+            var openPoseData = extractAngles(JSON.parse(data));
+            if (openPoseData[0] == 0 || openPoseData[0] == 1) return; //TODO: TURN THIS ON FOR FINAL VERSION
+            else imageProcessing("./processing/pictures/" + user + "." + ext, openPoseData[1][0], openPoseData[1][1], openPoseData[1][2], openPoseData[1][3], (err, trainingImage) => {
+                openPoseFrameProcessing(("./processing/pictures/processed" + user + ".jpg"), (err, openposeImage) => { //TODO: FIX THIS PATH
+                    console.log("Finished processing file " + user + " images after " + (Date.now() - time) + "ms. Uploading data...");
+                    adb.ref("users/" + user).update({
+                        "lastUpdated": Date.now(),
+                        "latestOpenPoseFrame": openposeImage,
+                        "latestTensorData/angles": openPoseData[0],
+                        "latestTensorData/latestProcessedFrame": trainingImage
+                    });
+                });
+            });
+        });
+    }
+}
+
 function handleTrainingDataPost(body) { // Download a video, convert it to frames, then upload the processed frames to firebase to train.
     var framesFolder = getRandomKey();
     var videoID = ytdl.getVideoID(body.url);
     var validVideo = ytdl.validateURL("youtube.com/watch?v=" + videoID);
     if (!validVideo)
         console.log("No video found OR not a valid video with ID \"" + videoID + "\" from \"" + body.url + "\"");
-    else downloadYoutubeVideo(videoID, framesFolder, (fps) => {
+    else downloadYoutubeVideo(videoID, framesFolder, fps => {
         var framesDict = {};
         var length = (Object.keys(body).length - 1) / 5;
         console.log("body: " + JSON.stringify(body));
@@ -175,7 +227,7 @@ function checkFramesComplete(check, video, folder, time) {
         if (!check[pose]) return;
     console.log("All frames for video " + video + " at folder " + folder + " have been extracted after " + (Date.now() - time) + "ms! Running Openpose on them...");
     processFrames(video, folder, false);
-    // runOpenPose("./processing/videos/" + video + "/" + folder + "/", processFrames(video, folder, true)); //TODO: FIX FOR ALEX'S COMPUTER
+    // runOpenPose("./processing/videos/" + video + "/" + folder + "/", "", () => { processFrames(video, folder, true) }); //TODO: FIX FOR ALEX'S COMPUTER
 }
 
 function processFrames(video, folder, openPosed) {
@@ -187,11 +239,11 @@ function processFrames(video, folder, openPosed) {
         fileEnd = ".jpg";
     }
     fs.readdir("./processing/videos/" + video + "/" + folder + "/", (err, files) => {
-        var completion = {};
-        files.forEach(file => {
-            if (path.extname(file) != fileExt) return;
-            completion[file.slice(0, -(fileEnd.length))] = false;
-        });
+        // var completion = {};
+        // files.forEach(file => {
+        //     if (path.extname(file) != fileExt) return;
+        //     completion[file.slice(0, -(fileEnd.length))] = false;
+        // });
         files.forEach(file => {
             if (path.extname(file) != fileExt) return;
             file = file.slice(0, -(fileEnd.length));
@@ -217,7 +269,7 @@ function uploadFrameData(video, folder, file, openPoseData, time) {
                 "pose": readPose(file),
                 "trainingFrame": trainingImage, // <- BASE 64 OF 100x100 grayscaled and cropped training images
                 "openposeFrame": openposeImage, // <- BASE 64 OF 100x100 cropped openpose output images
-            }, (err) => {
+            }, err => {
                 console.log("Finished uploading file " + file + " data after " + (Date.now() - time) + "ms..." + (delAftr ? " Deleting it now..." : ""));
                 if (delAftr) delFrame(video, folder, file);
                 removeDirectories('./processing');
@@ -236,16 +288,16 @@ function downloadYoutubeVideo(url, folder, callback) { // Check if a video is do
         var videoDownload = fs.createWriteStream(dirStart);
         ytdl("youtube.com/watch?v=" + url, {
             quality: 'highestvideo',
-            filter: (format) => format.container === 'mp4' && format.audioEncoding === null
+            filter: format => format.container === 'mp4' && format.audioEncoding === null
         }).pipe(videoDownload);
-        videoDownload.on('open', (data) => {
+        videoDownload.on('open', data => {
             console.log("Started downloading video " + url + " after " + (Date.now() - time) + "ms");
         });
-        videoDownload.on('error', (data) => {
+        videoDownload.on('error', data => {
             console.log("Video " + url + " FAILED TO DOWNLOAD after " + (Date.now() - time) + "ms");
         });
         videoDownload.on('finish', () => {
-            fs.rename(dirStart, dirDone, function(err) {
+            fs.rename(dirStart, dirDone, err => {
                 console.log("Finished downloading video " + url + " after " + (Date.now() - time) + "ms");
                 getFPS(dirDone, callback);
             });
@@ -269,15 +321,17 @@ function getFPS(path, callback) { // ffprobe -v 0 -of csv=p=0 -select_streams 0 
     });
 }
 // ==================== OPENPOSE + IMG PROCESSING FUNCTIONS ====================
-function runOpenPose(dir, callback) { // OpenPoseDemo.exe --image_dir [DIRECTORY] --write_images [DIRECTORY] --write_keypoint_json [DIRECTORY] --no_display
+function runOpenPose(dir, outDir, callback) { // OpenPoseDemo.exe --image_dir [DIRECTORY] --write_images [DIRECTORY] --write_keypoint_json [DIRECTORY] --no_display
     var time = Date.now();
-    console.log("Running openPoseDemo on \"" + dir + "\"...");
+    if (outDir == "") outDir = dir;
+    console.log("Running openPoseDemo on \"" + dir + "\" outputting to \"" + outDir + "\"...");
     exec("openPoseDemo", ["--image_dir", dir,
-        "--write_images", dir,
-        "--write_keypoint_json", dir,
+        "--write_images", outDir,
+        "--write_keypoint_json", outDir,
         "--no_display"
     ], (error, stdout, stderr) => {
-        console.log("Finished running openPoseDemo in " + (Date.now() - time) + "ms, processing files now...");
+        // console.log(error); console.log(stdout); console.log(stderr);
+        console.log("Finished running openPoseDemo in " + (Date.now() - time) + "ms @ " + dir + " to " + outDir + "; processing files now...");
         callback();
     });
 }
@@ -305,9 +359,7 @@ function extractAngles(poseData) {
 }
 
 function imageProcessing(path, x1, y1, x2, y2, cb) {
-    jimp.read(path, function(err, image) {
-        // var x = x1 > 0 && y1 > 0 ? image.bitmap.width - x1 : Math.abs(x1);
-        // var y = x1 > 0 && y1 > 0 ? image.bitmap.height - y1 : Math.abs(y1);
+    jimp.read(path, (err, image) => {
         background.resize((x2 - x1), (y2 - y1)) // Resizes the 1x1 Gray to the size we need it
             .composite(image, -x1, -y1) //Composite the image to have no Grey
             .resize(size, size) //resize to 100 x 100
@@ -318,7 +370,7 @@ function imageProcessing(path, x1, y1, x2, y2, cb) {
 }
 
 function openPoseFrameProcessing(path, cb) {
-    jimp.read(path, function(err, image) {
+    jimp.read(path, (err, image) => {
         image.resize(size, size)
             .quality(100)
             .getBase64(jimp.MIME_JPEG, cb);
