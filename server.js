@@ -86,7 +86,12 @@ tdb.ref("frames").on("value", snap => {
     });
 });
 adb.ref("users").on("child_added", (snap, prevChildKey) => {
-    users.push(snap.val().key);
+    var obj = {};
+    obj[snap.val().key] = snap.val().updating;
+    users.push(obj);
+    adb.ref("users/" + snap.val().key + "/updating").on("value", snap => {
+        users[snap.ref.parent.key] = snap.val();
+    });
     adb.ref("users/" + snap.val().key + "/latestFrame").on("value", snap => {
         var time = Date.now();
         var data = snap.val();
@@ -151,8 +156,9 @@ app.get('/api/redownload', (req, res) => {
 function handleAppDataUpdating(ext) {
     runOpenPose("./processing/pictures", "./processing/pictures/processed", () => { handleAppDataUpdating(ext); });
     var time = Date.now();
-    for (const user of users) {
-        fs.readFile("./processing/pictures/processed/" + user + "_keypoints.json", 'utf8', (err, data) => {
+    for (const user of Object.keys(users)) {
+        if (!users[user]) return;
+        else fs.readFile("./processing/pictures/processed/" + user + "_keypoints.json", 'utf8', (err, data) => {
             console.log("Finished reading file " + user + " json after " + (Date.now() - time) + "ms. Processing image...");
             var openPoseData = extractAngles(JSON.parse(data));
             if (openPoseData[0] == 0 || openPoseData[0] == 1) return; //TODO: TURN THIS ON FOR FINAL VERSION
@@ -388,7 +394,7 @@ function getAngleAbsolute(x1, y1, x2, y2) { // Convert lines to vectors
 }
 // TODO: FINISH THIS METHOD
 function getAngleRelative() { /* Convert 2 lines to 2 vectors to get the angle between vectors */ }
-// ========================== HELPER FUNCTIONS ==========================
+// ============================= HELPER FUNCTIONS ==============================
 function ensureDirectoryExistence(filePath) {
     var dirname = path.dirname(filePath);
     if (fs.existsSync(dirname)) return true;
