@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en" ng-app>
+
+<head>
+    <title>Training Data</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            text-align: center;
+        }
+
+        form input {
+            width: 19%;
+            /*min-width: 150px;*/
+        }
+
+        select {
+            width: 19%;
+        }
+        
+        table, th, td {
+            border: 1px solid black;
+        }
+        
+        .tf {
+            width: 100px;
+            height: 100px;
+        }
+    </style>
+</head>
+
+<body>
+    <input type="button" value="Add More Data" onclick="addFields();" />
+    <input type="button" value="Delete Last Data" onclick="delFields();" />
+    <form method="post" action="/postapi" class="inline">
+        <input name="url" placeholder="YouTube Link 1" required>
+        <br>
+        <div id="add"></div>
+        <input type="submit" value="Submit">
+    </form>
+    <hr>
+    <div id="downloads"></div>
+    <a href="/training_data.js" download="training_data.js"><input type="button" value="Download ALL the latest training data as JSON"/></a>
+    <p id="lastUpdated"></p>
+    <hr>
+    <input type="button" value="Show Firebase Training Data" onclick="showData();" />
+    <select name="dataType" id="selectedData" ></select>
+    <br>
+    <br>
+    <!-- <p id="dataTypes"></p> -->
+    <table style="width:100%" id="tdb"><tr><th>pose</th><th>trainingFrame</th><th>openposeFrame</th><th>DATA</th><th>key</th></tr></table>
+    <script src="https://www.gstatic.com/firebasejs/4.12.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/4.12.1/firebase-database.js"></script>
+    <script type="text/javascript">
+        firebase.initializeApp({
+            apiKey: "AIzaSyBfzO0wkhLUX0sSKeQi1d7uMvvJrf7Ti4s",
+            authDomain: "yoga-master-training-db.firebaseapp.com",
+            databaseURL: "https://yoga-master-training-db.firebaseio.com",
+            projectId: "yoga-master-training-db",
+            storageBucket: "yoga-master-training-db.appspot.com",
+            messagingSenderId: "743195328789"
+        });
+        var tdb = firebase.database();
+        var time = 0;
+        var downloadSection = document.getElementById("downloads");
+        var selectedData = document.getElementById("selectedData");
+        selectedData.onchange = function (e) { showData(); }
+        setInterval(updateTime, 1000);
+        tdb.ref("lastUpdated").on("value", function(snapshot) { time = snapshot.val(); });
+        tdb.ref("types").on("value", function(snapshot) {
+            var types = "";
+            document.querySelectorAll('#selectedData option').forEach(option => option.remove());
+            downloadSection.innerHTML = "";
+            for (const key in snapshot.val()) {
+                var option = document.createElement("option");
+                option.text = snapshot.val()[key].toUpperCase();
+                option.value = key;
+                selectedData.appendChild(option);
+                types += key+" -> "+snapshot.val()[key]+"<br>";
+                downloadSection.innerHTML += "<a href=\"/training_"+snapshot.val()[key]+".csv\" download=\"training_"+snapshot.val()[key]+".csv\"><input type=\"button\" value=\"Download the latest training "+snapshot.val()[key].toUpperCase()+" data as a CSV\"/></a><br><br>"
+            }
+            if(document.getElementById("dataTypes")) document.getElementById("dataTypes").innerHTML = types.slice(0, -2);
+        });
+        function updateTime() {
+            document.getElementById("lastUpdated").innerHTML = "Last updated @ "+(new Date(time)).toLocaleString()+", "+Math.round((Date.now() - time)/1000)+" seconds ago";
+        }
+        function showData() {
+            console.log("Showing Firebase Training Data of dataType "+selectedData.options[selectedData.selectedIndex].textContent+"...");
+            tdb.ref("frames").on("value", function(snapshot) {
+                var count = 1;
+                var time = Date.now();
+                var data = Object.values(snapshot.val()).sort((o1, o2) => o2.timestamp - o1.timestamp);
+                var table = document.getElementById("tdb");
+                table.innerHTML = "<tr><th>pose</th><th>trainingFrame</th><th>openposeFrame</th><th>"+selectedData.options[selectedData.selectedIndex].textContent.toUpperCase()+"</th><th>key</th></tr>";
+                for (const frame of data) {
+                    var row = document.createElement("tr");
+                    row.innerHTML = "<td>"+frame.pose+"</td><td class='tf'><img src='"+frame.trainingFrame+"'></td><td class='tf'><img src='"+frame.openposeFrame+"'></td><td>"+JSON.stringify(frame[selectedData.options[selectedData.selectedIndex].value])+"</td><td class='deleteBtn'><a onclick='delData(\""+frame.key+"\");' href='javascript:void(0);'>Delete "+frame.key+"</a></td>";//<input type='button' value='Delete "+frame.key+"' onclick='delData(\""+frame.key+"\");'/></td>";
+                    table.appendChild(row);
+                    console.log("Writing row "+count+", key "+frame.key+" after "+(Date.now() - time)+"ms.");
+                    count++;
+                }
+            });
+        }
+        async function delData(key) {
+            let response = await window.fetch("/api/deleteKey/"+key);
+            let data = await response.json();
+            console.log(data);
+        }
+        var count = 1;
+        function addFields() { //code for adding the next three fields again
+            var newStartMin = document.createElement('input');
+            newStartMin.setAttribute("placeholder", "TimeStamp Minute Start " + count);
+            newStartMin.setAttribute("name", "startTimeStampMin" + count);
+            newStartMin.setAttribute("id", "startTimeStampMin" + count);
+            newStartMin.setAttribute("type", "number");
+            newStartMin.setAttribute("step", "1");
+            newStartMin.setAttribute("min", "0");
+            newStartMin.setAttribute("required", true);
+            document.getElementById("add").appendChild(newStartMin);
+            var newStartSec = document.createElement('input');
+            newStartSec.setAttribute("placeholder", "TimeStamp Second Start " + count);
+            newStartSec.setAttribute("name", "startTimeStampSec" + count);
+            newStartSec.setAttribute("id", "startTimeStampSec" + count);
+            newStartSec.setAttribute("type", "number");
+            newStartSec.setAttribute("step", "1");
+            newStartSec.setAttribute("min", "0");
+            newStartSec.setAttribute("max", "60");
+            newStartSec.setAttribute("required", true);
+            document.getElementById("add").appendChild(newStartSec);
+            var newEndMin = document.createElement('input');
+            newEndMin.setAttribute("placeholder", "TimeStamp Minute End " + count);
+            newEndMin.setAttribute("name", "endTimeStampMin" + count);
+            newEndMin.setAttribute("id", "endTimeStampMin" + count);
+            newEndMin.setAttribute("type", "number");
+            newEndMin.setAttribute("min", "0");
+            newEndMin.setAttribute("step", "1");
+            newEndMin.setAttribute("required", true);
+            document.getElementById("add").appendChild(newEndMin);
+            var newEndSec = document.createElement('input');
+            newEndSec.setAttribute("placeholder", "TimeStamp Second End " + count);
+            newEndSec.setAttribute("name", "endTimeStampSec" + count);
+            newEndSec.setAttribute("id", "endTimeStampSec" + count);
+            newEndSec.setAttribute("type", "number");
+            newEndSec.setAttribute("step", "1");
+            newEndSec.setAttribute("min", "0");
+            newEndSec.setAttribute("max", "60");
+            newEndSec.setAttribute("required", true);
+            document.getElementById("add").appendChild(newEndSec);
+            var newSelect = document.createElement('select')
+            newSelect.setAttribute("name", "selectedPose" + count);
+            newSelect.setAttribute("id", "selectedPose" + count);
+            newSelect.setAttribute("required", true);
+            var array = ["warriorii", "tree", "triangle"];
+            var arrayText = ["Warrior 2 Pose", "Tree Pose", "Triangle Pose"];
+            for (var i = 0; i < 3; i++) {
+                var option = document.createElement("option");
+                option.value = array[i];
+                option.text = arrayText[i];
+                newSelect.appendChild(option);
+            }
+            document.getElementById("add").appendChild(newSelect);
+            console.log("Adding #" + count + " fields...");
+            count += 1;
+        }
+        function delFields() {
+            if (count == 1) return;
+            count -= 1;
+            console.log("Deleting #" + count + " fields...");
+            document.getElementById('startTimeStampMin' + count).remove();
+            document.getElementById('startTimeStampSec' + count).remove();
+            document.getElementById('endTimeStampMin' + count).remove();
+            document.getElementById('endTimeStampSec' + count).remove();
+            document.getElementById('selectedPose' + count).remove();
+        }
+    </script>
+</body>
+
+</html>
