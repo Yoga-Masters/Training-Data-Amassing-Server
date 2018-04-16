@@ -5,7 +5,7 @@ const jimp = require("jimp");
 const http = require('http');
 const path = require('path');
 const cors = require('cors');
-const fsx = require('fs-extra');
+// const fsx = require('fs-extra');
 const rimraf = require('rimraf');
 const crypto = require("crypto");
 const ytdl = require('ytdl-core');
@@ -81,9 +81,9 @@ tdb.ref("frames").on("value", snap => {
         "triangle": 2
     };
     ensureDirectoryExistence("./client/test.data");
-    ensureDirectoryExistence("./training/data/test.data");
-    ensureDirectoryExistence("./training/images/test.data");
-    ensureDirectoryExistence("./training/both/test.data");
+    // ensureDirectoryExistence("./training/data/test.data");
+    // ensureDirectoryExistence("./training/images/test.data");
+    // ensureDirectoryExistence("./training/both/test.data");
     for (const type in types) trainingData[type] = [];
     for (const key of Object.keys(data)) {
         for (const type in types)
@@ -97,15 +97,15 @@ tdb.ref("frames").on("value", snap => {
         jsonDATA += "const " + dType + "_CLASSES = " + JSON.stringify(Object.keys(poseIndex)) + ";\nconst " + dType + "_NUM_CLASSES = " + dType + "_CLASSES.length;\nconst " + dType + "_DATA = " + JSON.stringify(trainingData[type]) + ";\n\n";
     }
     fs.writeFile("./client/training_data.js", jsonDATA, 'utf8', err => {
-        fsx.copy("./client/training_data.js", "./training/data/training_data.js");
-        fsx.copy("./client/training_data.js", "./training/both/training_data.js");
+        // fsx.copy("./client/training_data.js", "./training/data/training_data.js");
+        // fsx.copy("./client/training_data.js", "./training/both/training_data.js");
         console.log("Wrote all data types in json from scratch in " + (Date.now() - time) + "ms @ " + server.address().address + ":" + server.address().port + "/training");
         for (const type in types) stringify(trainingData[type], (err, output) => {
             output = trainingData[type].length + "," + (trainingData[type][0].length - 1) + "," + Object.keys(poseIndex) + "\n" + output;
             fs.writeFile("./client/training_" + types[type] + ".csv", output, 'utf8', err => {
                 tdb.ref("lastUpdated").set(Date.now());
-                fsx.copy("./client/training_" + types[type] + ".csv", "./training/data/training_" + types[type] + ".csv");
-                fsx.copy("./client/training_" + types[type] + ".csv", "./training/both/training_" + types[type] + ".csv");
+                // fsx.copy("./client/training_" + types[type] + ".csv", "./training/data/training_" + types[type] + ".csv");
+                // fsx.copy("./client/training_" + types[type] + ".csv", "./training/both/training_" + types[type] + ".csv");
                 console.log("Wrote " + types[type] + " data from scratch in " + (Date.now() - time) + "ms @ " + server.address().address + ":" + server.address().port + "/training");
             });
         });
@@ -136,9 +136,9 @@ app.get('/api', (req, res) => res.send({
 }));
 app.post('/postapi', (req, res) => {
     handleTrainingDataPost(req.body);
-    fs.appendFile('history.txt', JSON.stringify(req.body) + "\n", err => {
+    fs.appendFile('./client/history.txt', JSON.stringify(req.body) + "\n", err => {
         console.log("Got a POST: " + JSON.stringify(req.body) + "\nSaved to history.txt!");
-        fsx.copy("history.txt", "./client/history.txt");
+        // fsx.copy("history.txt", "./client/history.txt");
         res.redirect('/');
     });
 });
