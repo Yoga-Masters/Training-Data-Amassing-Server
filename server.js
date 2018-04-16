@@ -33,7 +33,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(cors());
 app.use(express.static(path.resolve(__dirname, 'client')));
-server.listen(process.env.PORT || 3000, process.env.IP || "0.0.0.0", () => console.log("Youtube Downloader listening at", server.address().address + ":" + server.address().port));
+server.listen(process.env.PORT || 80, process.env.IP || "0.0.0.0", () => console.log("Youtube Downloader listening at", server.address().address + ":" + server.address().port));
 // ============================ FIREBASE SETUP =================================
 admin.initializeApp({ // Connecting to Firebase Training Database
     credential: admin.credential.cert(require("./json/yoga-master-training-db-d9acdc86dca0.json")),
@@ -95,6 +95,7 @@ adb.ref("users").on("child_added", (snap, prevChildKey) => {
     adb.ref("users/" + snap.val().key + "/latestFrame").on("value", snap => {
         var time = Date.now();
         var data = snap.val();
+        if(data == "") return;
         var key = snap.ref.parent.key;
         var ext = snap.val().split(';')[0].match(/jpeg|png|gif|jpg|webp/)[0];
         fs.writeFile("./processing/pictures/" + key + "." + ext, data.replace(/^data:image\/\w+;base64,/, ""), 'base64', err => {
@@ -343,8 +344,9 @@ function runOpenPose(dir, outDir, callback) { // OpenPoseDemo.exe --image_dir [D
 }
 // TODO: FINISH THIS METHOD
 function extractAngles(poseData) {
-    var noPerson = poseData.hasOwnProperty('people') && poseData.people.length > 0;
-    var fullPerson = noPerson && poseData.people[0].pose_keypoints.length > 54;
+    var hasPerson = poseData.hasOwnProperty('people') && poseData.people.length > 0;
+    //TODO Change to for loop method
+    var fullPerson = hasPerson && poseData.people[0].pose_keypoints.length > 54;
     var keypoints = fullPerson ? poseData.people[0].pose_keypoints : null; // TODO: Read JSON file, Extract pose data from an array of 54 numbers
     var angles = fullPerson ? [getAngleAbsolute(keypoints[3], keypoints[4], keypoints[0], keypoints[1]),
         getAngleAbsolute(keypoints[3], keypoints[4], keypoints[15], keypoints[16]),
@@ -360,7 +362,7 @@ function extractAngles(poseData) {
         getAngleAbsolute(keypoints[36], keypoints[37], keypoints[39], keypoints[40]),
         getAngleAbsolute(keypoints[27], keypoints[28], keypoints[30], keypoints[31]),
         //TODO: PUT IN RELATIVE ANGLES
-    ] : (!noPerson ? 0 : 1);
+    ] : (!hasPerson ? 0 : 1);
     return [angles, [450, 50, 1450, 1050]]; // TODO: FIX THIS TO CORRECT NUMBERS
 }
 

@@ -1,3 +1,2 @@
 
-{"url":"https://www.youtube.com/watch?v=UIrLyE7iz50","startTimeStampMin1":"1","startTimeStampSec1":"0","endTimeStampMin1":"1","endTimeStampSec1":"1","selectedPose1":"warriorii"}
-{"url":"https://www.youtube.com/watch?v=UIrLyE7iz50","startTimeStampMin1":"1","startTimeStampSec1":"1","endTimeStampMin1":"1","endTimeStampSec1":"2","selectedPose1":"warriorii"}
+{"url":"UIrLyE7iz50","startTimeStampMin1":"0","startTimeStampSec1":"0","endTimeStampMin1":"0","endTimeStampSec1":"5","selectedPose1":"warriorii"}
