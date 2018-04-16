@@ -1,4 +1,4 @@
-// cls && browser-sync start --proxy localhost:80 --files "**/*" | npm start
+// cls && browser-sync start --proxy localhost:80 --files "**/*" && ngrok http --bind-tls "both" 80 | npm start
 // ============================ PACKAGES SETUP =================================
 const fs = require('fs');
 const jimp = require("jimp");
@@ -175,53 +175,33 @@ app.get('/api/redownload', (req, res) => {
         });
     });
 });
-// ======================== YOUTUBE DOWNLOADER FUNCTIONS =======================
-// older version that updates everything
-// function handleAppDataUpdating(user, ext, time) { 
-//     for (const user of Object.keys(users)) {
-//         console.log("Starting reading files for " + user + " after " + (Date.now() - time) + "ms...");
-//         if (!users[user]) return;
-//         else fs.readFile("./processing/pictures/processed/" + user + "_keypoints.json", 'utf8', (err, data) => {
-//             console.log("Finished reading file " + user + " json after " + (Date.now() - time) + "ms. Processing image...");
-//             var openPoseData = extractAngles(JSON.parse(data));
-//             if (openPoseData[0] == 0 || openPoseData[0] == 1) return; //TODO: TURN THIS ON FOR FINAL VERSION
-//             else imageProcessing("./processing/pictures/" + user + "." + ext, openPoseData[1][0], openPoseData[1][1], openPoseData[1][2], openPoseData[1][3], (err, trainingImage) => {
-//                 openPoseFrameProcessing(("./processing/pictures/processed" + user + ".jpg"), (err, openposeImage) => { //TODO: FIX THIS PATH
-//                     console.log("Finished processing file " + user + " images after " + (Date.now() - time) + "ms. Uploading data...");
-//                     adb.ref("users/" + user).update({
-//                         "lastUpdated": Date.now(),
-//                         "latestOpenPoseFrame": openposeImage,
-//                         "latestTensorData/angles": openPoseData[0],
-//                         "latestTensorData/latestProcessedFrame": trainingImage
-//                     });
-//                 });
-//             });
-//         });
-//     }
-// }
-
+// ==================== APP HANDLING PROCESSING FUNCTIONS ====================
 function handleAppDataUpdating(user, ext, time) {
     fs.readFile("./processing/pictures/processed/" + user + "_keypoints.json", 'utf8', (err, data) => {
         console.log("Finished reading file " + user + " json after " + (Date.now() - time) + "ms. Processing image...");
         var openPoseData = extractData(JSON.parse(data));
-        // if (openPoseData[1] == 0 || openPoseData[1] == 1) return; //TODO: TURN THIS ON FOR FINAL VERSION
-        imageProcessing("./processing/pictures/" + user + "." + ext, openPoseData[0][0], openPoseData[0][1], openPoseData[0][2], openPoseData[0][3], (err, trainingImage) => {
-            openPoseFrameProcessing(("./processing/pictures/processed/" + user + "_rendered.png"), (err, openposeImage) => {
-                console.log("Finished processing file " + user + " images after " + (Date.now() - time) + "ms. Uploading data...");
-                for(var type in types) {
-
-                }
-                adb.ref("users/" + user).update({
-                    "lastUpdated": Date.now(),
-                    "latestOpenPoseFrame": openposeImage,
-                    "latestTensorData/angles": openPoseData[0],
-                    "latestTensorData/latestProcessedFrame": trainingImage
-                });
-            });
+        if (openPoseData[1] == 0 || openPoseData[1] == 1)
+            updateAppData(user, openPoseData, {}, time);
+        else imageProcessing("./processing/pictures/" + user + "." + ext, openPoseData[0][0], openPoseData[0][1], openPoseData[0][2], openPoseData[0][3], (err, trainingImage) => {
+            console.log("Openpose successfully found a whole person!");
+            updateAppData(user, openPoseData, {
+                "latestTensorData/latestProcessedFrame": trainingImage
+            }, time);
         });
     });
 }
 
+function updateAppData(user, openPoseData, newData, time) {
+    openPoseFrameProcessing(("./processing/pictures/processed/" + user + "_rendered.png"), (err, openposeImage) => {
+        console.log("Finished processing file " + user + " images after " + (Date.now() - time) + "ms. Uploading data...");
+        newData["lastUpdated"] = Date.now();
+        newData["latestOpenPoseFrame"] = openposeImage;
+        for (var type in openPoseData)
+            if (type > 0) newData["latestTensorData/datatype" + type] = openPoseData[type];
+        adb.ref("users/" + user).update(newData);
+    });
+}
+// ======================== YOUTUBE DOWNLOADER FUNCTIONS =======================
 function handleTrainingDataPost(body) { // Download a video, convert it to frames, then upload the processed frames to firebase to train.
     var framesFolder = getRandomKey();
     var videoID = ytdl.getVideoID(body.url);
@@ -279,50 +259,67 @@ function checkFramesComplete(check, video, folder, time) {
     for (const pose of Object.keys(check))
         if (!check[pose]) return;
     console.log("All frames for video " + video + " at folder " + folder + " have been extracted after " + (Date.now() - time) + "ms! Running Openpose on them...");
-    processFrames(video, folder, false);
-    // runOpenPose("./processing/videos/" + video + "/" + folder + "/", "", () => { processFrames(video, folder, true) }); //TODO: FIX FOR ALEX'S COMPUTER
+    runOpenPose("./processing/videos/" + video + "/" + folder, "", () => {
+        processFrames(video, folder)
+    });
 }
 
-function processFrames(video, folder, openPosed) {
+function processFrames(video, folder) {
     var time = Date.now();
-    var fileExt = ".json";
-    var fileEnd = "_keypoints.json";
-    if (!openPosed) {
-        fileExt = ".jpg";
-        fileEnd = ".jpg";
-    }
-    fs.readdir("./processing/videos/" + video + "/" + folder + "/", (err, files) => {
-        // var completion = {};
-        // files.forEach(file => {
-        //     if (path.extname(file) != fileExt) return;
-        //     completion[file.slice(0, -(fileEnd.length))] = false;
-        // });
+    fs.readdir("./processing/videos/" + video + "/" + folder, (err, files) => {
         files.forEach(file => {
-            if (path.extname(file) != fileExt) return;
-            file = file.slice(0, -(fileEnd.length));
+            if (path.extname(file) != ".jpg") return;
+            file = file.slice(0, -(".jpg".length));
             console.log("Processing file " + file + " after " + (Date.now() - time) + "ms...");
-            if (!openPosed) uploadFrameData(video, folder, file, extractAngles({}), time);
-            else fs.readFile("./processing/videos/" + video + "/" + folder + "/" + file + "_keypoints.json", 'utf8', (err, data) => {
-                uploadFrameData(video, folder, file, extractAngles(JSON.parse(data)), time);
+            fs.readFile("./processing/videos/" + video + "/" + folder + "/" + file + "_keypoints.json", 'utf8', (err, data) => {
+                console.log("Finished reading file " + file + " json after " + (Date.now() - time) + "ms. Processing images...");
+                uploadFrameData(video, folder, file, extractData(JSON.parse(data)), time);
             });
         });
     });
 }
 
+// function handleAppDataUpdating(user, ext, time) {
+//     fs.readFile("./processing/pictures/processed/" + user + "_keypoints.json", 'utf8', (err, data) => {
+//         console.log("Finished reading file " + user + " json after " + (Date.now() - time) + "ms. Processing image...");
+//         var openPoseData = extractData(JSON.parse(data));
+//         if (openPoseData[1] == 0 || openPoseData[1] == 1)
+//             updateAppData(user, openPoseData, {}, time);
+//         else imageProcessing("./processing/pictures/" + user + "." + ext, openPoseData[0][0], openPoseData[0][1], openPoseData[0][2], openPoseData[0][3], (err, trainingImage) => {
+//             console.log("Openpose successfully found a whole person!");
+//             updateAppData(user, openPoseData, {
+//                 "latestTensorData/latestProcessedFrame": trainingImage
+//             }, time);
+//         });
+//     });
+// }
+
+// function updateAppData(user, openPoseData, newData, time) {
+//     openPoseFrameProcessing(("./processing/pictures/processed/" + user + "_rendered.png"), (err, openposeImage) => {
+//         console.log("Finished processing file " + user + " images after " + (Date.now() - time) + "ms. Uploading data...");
+//         newData["lastUpdated"] = Date.now();
+//         newData["latestOpenPoseFrame"] = openposeImage;
+//         for (var type in openPoseData)
+//             if (type > 0) newData["latestTensorData/datatype" + type] = openPoseData[type];
+//         adb.ref("users/" + user).update(newData);
+//     });
+// }
+
 function uploadFrameData(video, folder, file, openPoseData, time) {
-    console.log("Finished reading file " + file + " json after " + (Date.now() - time) + "ms. Processing image...");
-    // if(openPoseData[0] == 0 || openPoseData[0] == 1) return; //TODO: TURN THIS ON FOR FINAL VERSION
-    imageProcessing("./processing/videos/" + video + "/" + folder + "/" + file + ".jpg", openPoseData[1][0], openPoseData[1][1], openPoseData[1][2], openPoseData[1][3], (err, trainingImage) => {
-        openPoseFrameProcessing(("./processing/videos/" + video + "/" + folder + "/" + file + ".jpg"), (err, openposeImage) => { //TODO: FIX THIS PATH
+    // if (openPoseData[1] == 0 || openPoseData[1] == 1) return; //TODO: TURN THIS ON FOR FINAL VERSION
+    imageProcessing("./processing/videos/" + video + "/" + folder + "/" + file + ".jpg", openPoseData[0][0], openPoseData[0][1], openPoseData[0][2], openPoseData[0][3], (err, trainingImage) => {
+        openPoseFrameProcessing(("./processing/videos/" + video + "/" + folder + "/" + file + "_rendered.png"), (err, openposeImage) => {
             console.log("Finished processing file " + file + " images after " + (Date.now() - time) + "ms. Uploading data...");
-            tdb.ref("frames/" + video + "-" + folder + "-" + file).set({
+            var newData = {
                 "timestamp": Date.now(),
                 "key": video + "-" + folder + "-" + file,
-                "angles": openPoseData[0],
                 "pose": readPose(file),
                 "trainingFrame": trainingImage, // <- BASE 64 OF 100x100 grayscaled and cropped training images
-                "openposeFrame": openposeImage, // <- BASE 64 OF 100x100 cropped openpose output images
-            }, err => {
+                "openposeFrame": openposeImage, // <- BASE 64 OF ?x100 resized openpose output images
+            };
+            for (var type in openPoseData)
+                if (type > 0) newData["datatype" + type] = openPoseData[type];
+            tdb.ref("frames/" + video + "-" + folder + "-" + file).set(newData, err => {
                 console.log("Finished uploading file " + file + " data after " + (Date.now() - time) + "ms..." + (delAftr ? " Deleting it now..." : ""));
                 if (delAftr) delFrame(video, folder, file);
                 removeDirectories('./processing');
@@ -388,13 +385,13 @@ function runOpenPose(dir, outDir, callback) { // OpenPoseDemo.exe --image_dir [D
     });
 }
 
+// TODO: FINISH THIS METHOD
 function extractData(poseData) {
     return [
         [450, 50, 1450, 1050], 0, 0, 0, 0
     ];
 }
 
-// TODO: FINISH THIS METHOD
 function extractAngles(poseData) {
     var hasPerson = poseData.hasOwnProperty('people') && poseData.people.length > 0;
     //TODO Change to for loop method
@@ -429,9 +426,9 @@ function imageProcessing(path, x1, y1, x2, y2, cb) {
     });
 }
 
-function openPoseFrameProcessing(path, cb) {
+function openPoseFrameProcessing(path, cb) { // TODO: Try to crop it to the actual image using the aspect ratio of the old image; currently assuming max height as 100px
     jimp.read(path, (err, image) => {
-        image.resize(size, size)
+        image.resize(jimp.AUTO, size)
             .quality(100)
             .getBase64(jimp.MIME_JPEG, cb);
     });
@@ -456,7 +453,7 @@ function ensureDirectoryExistence(filePath) {
     fs.mkdirSync(dirname);
 }
 
-function delFrame(video, folder, file) { //TODO: FIX FOR ALL THREE FILES
+function delFrame(video, folder, file) {
     delFile("./processing/videos/" + video + "/" + folder + "/" + file + ".jpg", () => {});
     delFile("./processing/videos/" + video + "/" + folder + "/" + file + "_rendered.png", () => {});
     delFile("./processing/videos/" + video + "/" + folder + "/" + file + "_keypoints.json", () => {});
@@ -566,3 +563,53 @@ function degreesToRadians(degrees) {
 //         });
 //     });
 // });
+// ---------
+// older version that updates everything
+// function handleAppDataUpdating(user, ext, time) { 
+//     for (const user of Object.keys(users)) {
+//         console.log("Starting reading files for " + user + " after " + (Date.now() - time) + "ms...");
+//         if (!users[user]) return;
+//         else fs.readFile("./processing/pictures/processed/" + user + "_keypoints.json", 'utf8', (err, data) => {
+//             console.log("Finished reading file " + user + " json after " + (Date.now() - time) + "ms. Processing image...");
+//             var openPoseData = extractAngles(JSON.parse(data));
+//             if (openPoseData[0] == 0 || openPoseData[0] == 1) return; //TODO: TURN THIS ON FOR FINAL VERSION
+//             else imageProcessing("./processing/pictures/" + user + "." + ext, openPoseData[1][0], openPoseData[1][1], openPoseData[1][2], openPoseData[1][3], (err, trainingImage) => {
+//                 openPoseFrameProcessing(("./processing/pictures/processed" + user + ".jpg"), (err, openposeImage) => { //TODO: FIX THIS PATH
+//                     console.log("Finished processing file " + user + " images after " + (Date.now() - time) + "ms. Uploading data...");
+//                     adb.ref("users/" + user).update({
+//                         "lastUpdated": Date.now(),
+//                         "latestOpenPoseFrame": openposeImage,
+//                         "latestTensorData/angles": openPoseData[0],
+//                         "latestTensorData/latestProcessedFrame": trainingImage
+//                     });
+//                 });
+//             });
+//         });
+//     }
+// }
+// ---------
+// function processFrames(video, folder, openPosed) {
+//     var time = Date.now();
+//     var ".jpg" = ".json";
+//     var pg" =  = "_keypoints.json";
+//     if (!openPosed) {
+//         ".jpg" = ".jpg";
+//         pg" =  = ".jpg";
+//     }
+//     fs.readdir("./processing/videos/" + video + "/" + folder + "/", (err, files) => {
+//         // var completion = {};
+//         // files.forEach(file => {
+//         //     if (path.extname(file) != ".jpg") return;
+//         //     completion[file.slice(0, ".jpg"(fileEnd.length))] = false;
+//         // });
+//         files.forEach(file => {
+//             if (path.extname(file) != ".jpg") return;
+//             file = file.slice(0, -(".jpg".length));
+//             console.log("Processing file " + file + " after " + (Date.now() - time) + "ms...");
+//             if (!openPosed) uploadFrameData(video, folder, file, extractAngles({}), time);
+//             else fs.readFile("./processing/videos/" + video + "/" + folder + "/" + file + "_keypoints.json", 'utf8', (err, data) => {
+//                 uploadFrameData(video, folder, file, extractAngles(JSON.parse(data)), time);
+//             });
+//         });
+//     });
+// }
