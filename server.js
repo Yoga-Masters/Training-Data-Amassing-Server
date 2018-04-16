@@ -5,7 +5,6 @@ const jimp = require("jimp");
 const http = require('http');
 const path = require('path');
 const cors = require('cors');
-// const fsx = require('fs-extra');
 const rimraf = require('rimraf');
 const crypto = require("crypto");
 const ytdl = require('ytdl-core');
@@ -81,9 +80,6 @@ tdb.ref("frames").on("value", snap => {
         "triangle": 2
     };
     ensureDirectoryExistence("./client/test.data");
-    // ensureDirectoryExistence("./training/data/test.data");
-    // ensureDirectoryExistence("./training/images/test.data");
-    // ensureDirectoryExistence("./training/both/test.data");
     for (const type in types) trainingData[type] = [];
     for (const key of Object.keys(data)) {
         for (const type in types)
@@ -97,15 +93,11 @@ tdb.ref("frames").on("value", snap => {
         jsonDATA += "const " + dType + "_CLASSES = " + JSON.stringify(Object.keys(poseIndex)) + ";\nconst " + dType + "_NUM_CLASSES = " + dType + "_CLASSES.length;\nconst " + dType + "_DATA = " + JSON.stringify(trainingData[type]) + ";\n\n";
     }
     fs.writeFile("./client/training_data.js", jsonDATA, 'utf8', err => {
-        // fsx.copy("./client/training_data.js", "./training/data/training_data.js");
-        // fsx.copy("./client/training_data.js", "./training/both/training_data.js");
         console.log("Wrote all data types in json from scratch in " + (Date.now() - time) + "ms @ " + server.address().address + ":" + server.address().port + "/training");
         for (const type in types) stringify(trainingData[type], (err, output) => {
             output = trainingData[type].length + "," + (trainingData[type][0].length - 1) + "," + Object.keys(poseIndex) + "\n" + output;
             fs.writeFile("./client/training_" + types[type] + ".csv", output, 'utf8', err => {
                 tdb.ref("lastUpdated").set(Date.now());
-                // fsx.copy("./client/training_" + types[type] + ".csv", "./training/data/training_" + types[type] + ".csv");
-                // fsx.copy("./client/training_" + types[type] + ".csv", "./training/both/training_" + types[type] + ".csv");
                 console.log("Wrote " + types[type] + " data from scratch in " + (Date.now() - time) + "ms @ " + server.address().address + ":" + server.address().port + "/training");
             });
         });
@@ -119,12 +111,12 @@ adb.ref("users").on("child_added", (snap, prevChildKey) => {
     adb.ref("users/" + snap.val().key + "/latestFrame").on("value", snap => {
         var time = Date.now();
         var data = snap.val();
-        if (data == "") return;
+        if (!data || data == "") return;
         var key = snap.ref.parent.key;
         var ext = snap.val().split(';')[0].match(/jpeg|png|gif|jpg|webp/)[0];
         fs.writeFile("./processing/pictures/" + key + "." + ext, data.replace(/^data:image\/\w+;base64,/, ""), 'base64', err => {
             console.log("Saved new latestFrame from user " + key + " frame in " + (Date.now() - time) + "ms to ./processing/pictures/" + key + "." + ext + "...");
-            runOpenPose("./processing/pictures", "./processing/pictures/processed", () => { //TODO: REPLACE WITH 1 IMAGE ONLY OR FASTER OPENPOSE???
+            runOpenPose("./processing/pictures", "./processing/pictures/processed", () => { //TODO: ALEX, CAN U REPLACE WITH 1 IMAGE ONLY OR FASTER OPENPOSE???
                 handleAppDataUpdating(key, ext, time);
             });
         });
@@ -138,7 +130,6 @@ app.post('/postapi', (req, res) => {
     handleTrainingDataPost(req.body);
     fs.appendFile('./client/history.txt', JSON.stringify(req.body) + "\n", err => {
         console.log("Got a POST: " + JSON.stringify(req.body) + "\nSaved to history.txt!");
-        // fsx.copy("history.txt", "./client/history.txt");
         res.redirect('/');
     });
 });
@@ -279,34 +270,8 @@ function processFrames(video, folder) {
     });
 }
 
-// function handleAppDataUpdating(user, ext, time) {
-//     fs.readFile("./processing/pictures/processed/" + user + "_keypoints.json", 'utf8', (err, data) => {
-//         console.log("Finished reading file " + user + " json after " + (Date.now() - time) + "ms. Processing image...");
-//         var openPoseData = extractData(JSON.parse(data));
-//         if (openPoseData[1] == 0 || openPoseData[1] == 1)
-//             updateAppData(user, openPoseData, {}, time);
-//         else imageProcessing("./processing/pictures/" + user + "." + ext, openPoseData[0][0], openPoseData[0][1], openPoseData[0][2], openPoseData[0][3], (err, trainingImage) => {
-//             console.log("Openpose successfully found a whole person!");
-//             updateAppData(user, openPoseData, {
-//                 "latestTensorData/latestProcessedFrame": trainingImage
-//             }, time);
-//         });
-//     });
-// }
-
-// function updateAppData(user, openPoseData, newData, time) {
-//     openPoseFrameProcessing(("./processing/pictures/processed/" + user + "_rendered.png"), (err, openposeImage) => {
-//         console.log("Finished processing file " + user + " images after " + (Date.now() - time) + "ms. Uploading data...");
-//         newData["lastUpdated"] = Date.now();
-//         newData["latestOpenPoseFrame"] = openposeImage;
-//         for (var type in openPoseData)
-//             if (type > 0) newData["latestTensorData/datatype" + type] = openPoseData[type];
-//         adb.ref("users/" + user).update(newData);
-//     });
-// }
-
 function uploadFrameData(video, folder, file, openPoseData, time) {
-    // if (openPoseData[1] == 0 || openPoseData[1] == 1) return; //TODO: TURN THIS ON FOR FINAL VERSION
+    if (openPoseData[1] == 0 || openPoseData[1] == 1) return;
     imageProcessing("./processing/videos/" + video + "/" + folder + "/" + file + ".jpg", openPoseData[0][0], openPoseData[0][1], openPoseData[0][2], openPoseData[0][3], (err, trainingImage) => {
         openPoseFrameProcessing(("./processing/videos/" + video + "/" + folder + "/" + file + "_rendered.png"), (err, openposeImage) => {
             console.log("Finished processing file " + file + " images after " + (Date.now() - time) + "ms. Uploading data...");
@@ -379,16 +344,20 @@ function runOpenPose(dir, outDir, callback) { // OpenPoseDemo.exe --image_dir [D
         "--write_keypoint_json", outDir,
         "--no_display"
     ], (error, stdout, stderr) => {
-        // console.log(error); console.log(stdout); console.log(stderr);
         console.log("Finished running openPoseDemo in " + (Date.now() - time) + "ms @ " + dir + " to " + outDir + "; processing files now...");
         callback();
     });
 }
 
-// TODO: FINISH THIS METHOD
+// TODO: ALEX, FINISH THIS METHOD; USE THE EXTRACT ANGLES BELOW TO GET STARTED & FOLLOW THE RETURN PATTERN SPECIFIED; I DEPEND ON THAT FOR EVERYTHING ELSE
 function extractData(poseData) {
     return [
-        [450, 50, 1450, 1050], 0, 0, 0, 0
+        [450, 50, 1450, 1050], //CROP DIMENSIONS
+        0, // 0, 1, OR ARRAY OF RELATIVE MAGNITUDES; MAKE CO-ORDINATES RELATIVE TO 0 -> 1, AND THEN FIND MAGNITUDES OF EACH POINTS FROM A AVERAGE POINT OF ALL POINTS
+        0, // 0, 1, OR ARRAY OF RELATIVE CO-ORDINATE POSITIONS [X1, Y1, X2, Y2, ..., XN, YN], XN AND YN ARE BETWEEN 0 - 1
+        0, // 0, 1, OR ARRAY OF ANGLES BASED ON YOUR OLD METHOD THAT MIGHT BE DIRECTION AGNOSTIC
+        0 // 0, 1, OR ARRAY OF ANGLES BASED ON THE NEW WEBSITE WE FOUND, MAYBE?
+        // ANY OTHER WAYS WE CAN THINK OF GATHERING MEANING FROM OPEN POSE
     ];
 }
 
