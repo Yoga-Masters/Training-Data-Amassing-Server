@@ -173,6 +173,9 @@ function handleAppDataUpdating(user, ext, time) {
         console.log("Finished reading file " + user + " json after " + (Date.now() - time) + "ms. Processing image...");
         if(!data) return;
         var openPoseData = extractData(JSON.parse(data));
+
+        console.log(openPoseData);
+
         if (openPoseData[1] == 0 || openPoseData[1] == 1)
             updateAppData(user, openPoseData, {}, time);
         else imageProcessing("./processing/pictures/" + user + "." + ext, openPoseData[0][0], openPoseData[0][1], openPoseData[0][2], openPoseData[0][3], (err, trainingImage) => {
@@ -361,7 +364,7 @@ function extractData(poseData) {
         0] // 0, 1, OR ARRAY OF ANGLES BASED ON THE NEW WEBSITE WE FOUND, MAYBE?
         // ANY OTHER WAYS WE CAN THINK OF GATHERING MEANING FROM OPEN POSE
 
-    var output = [[-1, -1, -1, -1], 0, 0, 0];
+    var output = [[280, 0, 1000, 720], 0, 0, 0];
 
     //No pose
     if (poseData.people.length == 0)
@@ -377,10 +380,10 @@ function extractData(poseData) {
     }
 
     //Get crop data
-    output[0] = getCropData(poseData);
+    output[0] = getCropData(keypoints);
 
     if (!complete) {
-        return [output[0], 1, 1, 1];
+        return [[280, 0, 1000, 720], 1, 1, 1];
     }
     
     //Relative magnitudes
@@ -411,12 +414,12 @@ Note:
 function getCropData(keypoints) {
     //No pose is found
     if (keypoints.length == 0)
-        return 0;
+        return [280, 0, 1000, 720];
     //Checks for pose completion
-    for (var i=3; i<42; i++) {
-        if (keypoints[i] == 0)
-            return 1;
-    }
+    // for (var i=3; i<42; i++) {
+    //     if (keypoints[i] == 0)
+    //         return 1;
+    // }
 
     var upper  = Infinity;
     var lower = 0;
@@ -483,7 +486,7 @@ function extractMagnitudes(keypoints) {
     avgY = avgY/13;
 
     //[upper,left,lower,right]
-    var size   = getCropData(filename);
+    var size   = getCropData(keypoints);
     // width and height should be equal
     var width  = size[3] - size[1];
 
@@ -601,7 +604,7 @@ function AngleRelativeToLine(x1, y1, x2, y2) {
 //[X1, Y1, X2, Y2, ...]
 function extractRelativeCoordinates(keypoints) {
     //[upper,left,lower,right]
-    var size   = getCropData(filename);
+    var size   = getCropData(keypoints);
     // width and height should be equal
     var width  = size[3] - size[1];
     var output = [];
@@ -643,6 +646,7 @@ function extractAngles(poseData) {
 }
 
 function imageProcessing(path, x1, y1, x2, y2, cb) {
+    console.log(x1, y1, x2, y2);
     jimp.read(path, (err, image) => {
         background.resize((x2 - x1), (y2 - y1)) // Resizes the 1x1 Gray to the size we need it
             .composite(image, -x1, -y1) //Composite the image to have no Grey
