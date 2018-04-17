@@ -83,11 +83,12 @@ tdb.ref("frames").on("value", snap => {
     ensureDirectoryExistence("./client/test.data");
     for (const type in types) trainingData[type] = [];
     for (const key of Object.keys(data)) {
-        for (const type in types)
-            if (!(data[key][type] == 0 || data[key][type] == 1)) {
+        for (const type in types) {
+            if (data[key][type] && !(data[key][type] == 0 || data[key][type] == 1)) {
                 data[key][type].push(poseIndex[data[key].pose]);
                 trainingData[type].push(data[key][type]);
             }
+        }
     }
     for (const type in types) {
         var dType = types[type].toUpperCase();
@@ -173,9 +174,6 @@ function handleAppDataUpdating(user, ext, time) {
         console.log("Finished reading file " + user + " json after " + (Date.now() - time) + "ms. Processing image...");
         if(!data) return;
         var openPoseData = extractData(JSON.parse(data));
-
-        console.log(openPoseData);
-
         if (openPoseData[1] == 0 || openPoseData[1] == 1)
             updateAppData(user, openPoseData, {}, time);
         else imageProcessing("./processing/pictures/" + user + "." + ext, openPoseData[0][0], openPoseData[0][1], openPoseData[0][2], openPoseData[0][3], (err, trainingImage) => {
@@ -277,7 +275,7 @@ function processFrames(video, folder) {
 
 function uploadFrameData(video, folder, file, openPoseData, time) {
     if (openPoseData[1] == 0 || openPoseData[1] == 1) return;
-    imageProcessing("./processing/videos/" + video + "/" + folder + "/" + file + ".jpg", openPoseData[0][0], openPoseData[0][1], openPoseData[0][2], openPoseData[0][3], (err, trainingImage) => {
+    else imageProcessing("./processing/videos/" + video + "/" + folder + "/" + file + ".jpg", openPoseData[0][0], openPoseData[0][1], openPoseData[0][2], openPoseData[0][3], (err, trainingImage) => {
         openPoseFrameProcessing(("./processing/videos/" + video + "/" + folder + "/" + file + "_rendered.png"), (err, openposeImage) => {
             console.log("Finished processing file " + file + " images after " + (Date.now() - time) + "ms. Uploading data...");
             var newData = {
