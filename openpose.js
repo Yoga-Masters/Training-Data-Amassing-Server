@@ -13,9 +13,6 @@ Output: If -write_images is on, will write an image with keypoints labeled on it
         Also writes JSON file with keypoints in it in output directory.
 */
 function main() {
-    console.log(getAngleVectors({x:401, y:431}, {x:388,y:596}));
-    //console.log(getAngle(401, 431, 388, 596));
-
 
     //process.exit(1);
 
@@ -31,68 +28,27 @@ function main() {
         files.forEach(function(file, index) {
             //calculate angle
             var filename = './output/' + file.slice(0, -4) + '_keypoints.json';
-            var poseData;
-            var openposeData;
-            var poseData = extractAnglesFromJson(filename);
+            var poseData      = extractAnglesFromJson(filename);
+            var magnitudeData = extractMagnitudesJSON(filename);
+            var coordData     = extractRelativeCoordinatesJSON(filename);
 
             console.log(filename);
-            console.log(poseData);
-            console.log();
-
-            // START ANGLE EXTRACTION
-            /* 
-            var jsonData = JSON.parse(fs.readFileSync(filename, 'utf8'));
-
-            if (jsonData.people.length == 0) {
-                console.log("No pose detected")
-                poseData = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,-1];
-
-                console.log("Pose data for: " + file);
-                console.log(poseData);
-                console.log();
-            }
-            else {
-                openposeData = JSON.parse(fs.readFileSync(filename, 'utf8')).people[0].pose_keypoints;
-                var complete = true;
-                var keypoints = jsonData.people[0].pose_keypoints;
-                for (var i=0; i<42; i++) {
-                    if (keypoints[i] == 0)
-                        complete = false;
-                }
-                if (!complete) {
-                    console.log("Incomplete pose!")
-                }
-                openposeData = JSON.parse(fs.readFileSync(filename, 'utf8')).people[0].pose_keypoints;
-                poseData = extractAngles(filename);
-
-
-                console.log("Pose data for: " + file);
-                console.log(poseData);
-
-                //console.log(openposeData);
-
-                //crop
-
-                //find which is longer, vertical or horizontal
-                //pad the shorter size until image is square
-
-                //console.log(file.slice(0, -4) + '_cropped.jpg saved.');
-                //resize
-                //console.log(file.slice(0, -4) + '_resized.jpg saved.');
-                //grayscale
-                //console.log(file.slice(0, -4) + '_grayscale.jpg saved.');
-                
-            }
-            */
+            //console.log(poseData);
+            //console.log(magnitudeData);
+            console.log(coordData);
+            console.log("\n");
         });
     });
+
 }
+
 
 // Check flags
 function checkFlag(argument) {
-    var args =process.argv.slice(2);
+    var args = process.argv.slice(2);
     return (args.indexOf(argument) > -1);
 }
+
 
 /*
 Main command:./OpenPoseDemo.exe
@@ -123,7 +79,7 @@ function runOpenPose(inputDir, outputDir) {
                                                     '--no_display'
                                                     ]);
     }
-    console.log('Openpose complete.');
+    console.log('Openpose complete.\n');
 }
 
 
@@ -131,7 +87,6 @@ function runOpenPose(inputDir, outputDir) {
 Takes in a path to a .JSON file that has pose data
 Outputs an array with the following angles
 Angle definition can be found near getAngle() declaration below
-    neck
     l_shoulder
     r_shoulder
     l_arm
@@ -144,9 +99,7 @@ Angle definition can be found near getAngle() declaration below
     r_thigh
     l_leg
     r_leg
-*/
 
-/*
 Returns an array of angles if "pose" is valid
 A pose is valid if:
     At least one "person" was detected in the image
@@ -159,13 +112,9 @@ Else return
 function extractAnglesFromJson(filename) {
     // JSON contents
     var jsonData = JSON.parse(fs.readFileSync(filename, 'utf8'));
-    var poseData = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,-1];
+    var poseData = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1];
 
     if (jsonData.people.length == 0) {
-        //console.log("No pose detected");
-        //console.log("Pose data for: " + filename);
-        //console.log(poseData);
-        //console.log();
         return 0;
     }
     else {
@@ -174,7 +123,7 @@ function extractAnglesFromJson(filename) {
         var keypoints = jsonData.people[0].pose_keypoints;
         for (var i=3; i<42; i++) {
             if (keypoints[i] == 0)
-                complete = false;
+                return 1;
         }
         openposeData = JSON.parse(fs.readFileSync(filename, 'utf8')).people[0].pose_keypoints;
         //poseData = extractAngles(filename);
@@ -207,63 +156,53 @@ function extractAnglesFromJson(filename) {
         //1-0
         //var neck =          getAngle(keypoints[3],  keypoints[4],  keypoints[0],  keypoints[1]);
         //1-5
-        var l_shoulder =    getAngle(keypoints[3],  keypoints[4],  keypoints[15], keypoints[16]);
+        var l_shoulder =    getAngleRelativeToLine(keypoints[3],  keypoints[4],  keypoints[15], keypoints[16]);
         //1-2
-        var r_shoulder =    getAngle(keypoints[3],  keypoints[4],  keypoints[6],  keypoints[7]);
+        var r_shoulder =    getAngleRelativeToLine(keypoints[3],  keypoints[4],  keypoints[6],  keypoints[7]);
         //5-6
-        var l_arm =         getAngle(keypoints[15], keypoints[16], keypoints[18], keypoints[19]);
+        var l_arm =         getAngleRelativeToLine(keypoints[15], keypoints[16], keypoints[18], keypoints[19]);
         //2-3
-        var r_arm =         getAngle(keypoints[6],  keypoints[7],  keypoints[9],  keypoints[10]);
+        var r_arm =         getAngleRelativeToLine(keypoints[6],  keypoints[7],  keypoints[9],  keypoints[10]);
         //6-7
-        var l_farm =        getAngle(keypoints[18], keypoints[19], keypoints[21], keypoints[22]);
+        var l_farm =        getAngleRelativeToLine(keypoints[18], keypoints[19], keypoints[21], keypoints[22]);
         //3-4
-        var r_farm =        getAngle(keypoints[9],  keypoints[10], keypoints[12], keypoints[13]);
+        var r_farm =        getAngleRelativeToLine(keypoints[9],  keypoints[10], keypoints[12], keypoints[13]);
         //1-11
-        var l_spine =       getAngle(keypoints[3],  keypoints[4],  keypoints[33], keypoints[34]);
+        var l_spine =       getAngleRelativeToLine(keypoints[3],  keypoints[4],  keypoints[33], keypoints[34]);
         //1-8
-        var r_spine =       getAngle(keypoints[3],  keypoints[4],  keypoints[24], keypoints[25]);
+        var r_spine =       getAngleRelativeToLine(keypoints[3],  keypoints[4],  keypoints[24], keypoints[25]);
         //11-12
-        var l_thigh =       getAngle(keypoints[33], keypoints[34], keypoints[36], keypoints[37]);
+        var l_thigh =       getAngleRelativeToLine(keypoints[33], keypoints[34], keypoints[36], keypoints[37]);
         //8-9
-        var r_thigh =       getAngle(keypoints[24], keypoints[25], keypoints[27], keypoints[28]);
+        var r_thigh =       getAngleRelativeToLine(keypoints[24], keypoints[25], keypoints[27], keypoints[28]);
         //12-13
-        var l_leg =         getAngle(keypoints[36], keypoints[37], keypoints[39], keypoints[40]);
+        var l_leg =         getAngleRelativeToLine(keypoints[36], keypoints[37], keypoints[39], keypoints[40]);
         //9-10
-        var r_leg =         getAngle(keypoints[27], keypoints[28], keypoints[30], keypoints[31]);
+        var r_leg =         getAngleRelativeToLine(keypoints[27], keypoints[28], keypoints[30], keypoints[31]);
 
-        var output = [l_shoulder,
-                      r_shoulder,
-                      l_arm,
-                      r_arm,
-                      l_farm,
-                      r_farm,
-                      l_spine,
-                      r_spine,
-                      l_thigh,
-                      r_thigh,
-                      l_leg,
-                      r_leg];
-
-        if (!complete) {
-            //console.log("Incomplete pose!");
-            return 1;
-        }
-
-        //console.log("Pose data for: " + filename);
-        //console.log(poseData);
-
-        return output;
+        return [l_shoulder, r_shoulder,
+                l_arm, r_arm,
+                l_farm, r_farm,
+                l_spine, r_spine,
+                l_thigh, r_thigh,
+                l_leg, r_leg];
     }
 }
 
+
 /*
-Input: array of length 13 gotten from getAngles()
-output:array of length 13 with legs, thighs, arms, spine, 
+Input: array of length 12 gotten from getAngles()
+output:array of length 12 with left and right limbs swapped 
 */
 function flipAngles(angles) {
-    
+    var output = [angles[1], angles[0],
+                  angles[3], angles[2],
+                  angles[5], angles[4],
+                  angles[7], angles[6],
+                  angles[9], angles[8],
+                  angles[11],angles[10]];
+    return output;  
 }
-
 
 
 /*
@@ -278,14 +217,14 @@ If no pose is found, return -1
 Note:
     Does not guarantee that the coords are within original image dimensions.
     Pads so the crop dimensions are square.
-
+    THIS DOES NOT GUARANTEE THAT THE COORDINATES ARE VALID
 */
 function getCropData(filename) {
 
     var jsonData = JSON.parse(fs.readFileSync(filename, 'utf8'));
     //missing pose
     if (jsonData.people.length == 0)
-        return -1
+        return 0
 
     //get coords
     var upper  = Infinity;
@@ -317,49 +256,82 @@ function getCropData(filename) {
     height = lower - upper;
     width = right - left;
 
-    // console.log(upper);
-    // console.log(lower);
-    // console.log(left);
-    // console.log(right);
+    //padding
+    if (height > width) {
+        var padding = Math.round((height - width)/2);
+        left  -= padding;
+        right += padding;
+    }
+    else {
+        var padding = Math.round((width - height)/2);
+        upper -= padding;
+        lower += padding;
+    }
 
     return [upper,left,lower,right];
 }
 
+
 /*
 Returns an angle between two points relative to a straight line going up.
+This makes it so angles can be mirrored easily.
+To mirror angles, swap L/R limbs and multiply by -1
+
 Angle is determined as the following:
+
+    O
+  --+--
+    |
+   / \
 
 Degree  Shape (points 1 and 2)
 -------------
-//TODO WRITE DOC
+        2
+0       |
+        1
+-------------
+        | 2
+45      |/
+        1
+-------------
+      2 |
+-45    \|
+        1
+-------------
+        1
+180     |
+        2
+-------------
+        1
+135     |\                 
+        | 2
+-------------
+        1
+-135   /|
+      2 |
 -------------
 */
-// function getAngle(x1, y1, x2, y2) {
-//     // Convert lines to vectors
-//     var vectorX = x2 - x1;
-//     var vectorY = y2 - y1;
-//     var magnitude = Math.pow((Math.pow(vectorX, 2) + Math.pow(vectorY, 2)), 0.5);
+function getAngleRelativeToLine(x1, y1, x2, y2) {
+    // Convert points to vectors
+    var vectorX = x2 - x1;
+    var vectorY = y2 - y1;
+    var magnitude = Math.pow((Math.pow(vectorX, 2) + Math.pow(vectorY, 2)), 0.5);
 
-//     //var angle = radiansToDegrees(Math.acos(vectorY / magnitude));
+    var angle = Math.round(radiansToDegrees(Math.acos(vectorY / magnitude)));
 
-//     return (x2 >= x1) ? Math.round(angle) : (angle >= 180 ? 360 - angle : angle);
+    //return (x2 > x1) ? angle : (angle >= 180 ? 360 - angle : angle);
+    
+    return (x2 > x1) ? angle : -angle;
+}
 
-//     // if (x2 >= x1)
-//     //     return Math.round(angle);
-//     // return angle >= 180 ? 360 - angle : angle
-// }
 
-// function getAngle(x1, y1, x2, y2) {
-//     return getAngleVectors({x:x1, y:y1}, {x:x2,y:y2});
-//     // var angle = getAngleVectors({x:x1, y:y1}, {x:x2,y:y2});
-//     // return angle % 180;
-// }
-
+// TODO: Documentation
 function getAngle(x1, y1, x2, y2) {
     // return getAngleVectors({ x: x1, y: y1 }, { x: x2, y: y2 });
     var angle = getAngleVectors({ x: x1, y: y1 }, { x: x2, y: y2 });
     return angle % 180 < 0 ? angle % 180 + 180 : angle % 180;
 }
+
 
 function getAngleVectors(vectorA, vectorB) {
     return Math.round(Math.atan2(vectorB.y - vectorA.y, vectorB.x - vectorA.x) * 180 / Math.PI);
@@ -371,16 +343,126 @@ function getAngleVectors(vectorA, vectorB) {
 function getAngleAlt(x1, y1, x2, y2, x3, y3) {
     var vectorX = 0;
     var vectorY = 0;
-
-
 }
 
+
+// Converts radians to degrees
 function radiansToDegrees(radians) {
     return (radians * 180 / Math.PI);
 }
 
+
+// Converts degrees to radians
 function degreesToRadians(degrees) {
     return (degrees * Math.PI / 180);
+}
+
+
+/*
+Input: JSON file path
+Output: 0 = no pose
+        1 = incomplete pose
+        Array of scaled magnitudes trimmed to 5 decimal places
+            Scale is magnitude / pose width
+*/
+function extractMagnitudesJSON(filename) {
+    var jsonData = JSON.parse(fs.readFileSync(filename, 'utf8'));
+    // left + right shoulders, arms, farms, spine, thighs, legs
+    var poseData = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1];
+
+    if (jsonData.people.length == 0) {
+        return 0;
+    }
+    openposeData = JSON.parse(fs.readFileSync(filename, 'utf8')).people[0].pose_keypoints;
+    var keypoints = jsonData.people[0].pose_keypoints;
+    for (var i=3; i<42; i++) {
+        if (keypoints[i] == 0)
+            return 1;
+    }
+
+    //find midpoint (average of all points)
+    var avgX = 0;
+    var avgY = 0;
+
+    for(var i=1; i<=13; i++) {
+        avgX += openposeData[i*3 ];
+        avgY += openposeData[i*3 + 1]
+    }
+    avgX = avgX/13;
+    avgY = avgY/13;
+
+    //[upper,left,lower,right]
+    var size   = getCropData(filename);
+    // width and height should be equal
+    var width  = size[3] - size[1];
+
+    console.log("width, height in pixels " + width + ", " + height)
+    
+    //Trims to 5 decimal places
+    var l_shoulder = parseFloat((magnitude(openposeData[15], openposeData[16], avgX, avgY) / width).toFixed(3));
+    var r_shoulder = parseFloat((magnitude(openposeData[6],  openposeData[7],  avgX, avgY) / width).toFixed(3));
+    var l_arm      = parseFloat((magnitude(openposeData[18], openposeData[19], avgX, avgY) / width).toFixed(3));
+    var r_arm      = parseFloat((magnitude(openposeData[9],  openposeData[10], avgX, avgY) / width).toFixed(3));
+    var l_farm     = parseFloat((magnitude(openposeData[21], openposeData[22], avgX, avgY) / width).toFixed(3));
+    var r_farm     = parseFloat((magnitude(openposeData[12], openposeData[13], avgX, avgY) / width).toFixed(3));
+    var l_spine    = parseFloat((magnitude(openposeData[33], openposeData[34], avgX, avgY) / width).toFixed(3));
+    var r_spine    = parseFloat((magnitude(openposeData[24], openposeData[25], avgX, avgY) / width).toFixed(3));
+    var l_thigh    = parseFloat((magnitude(openposeData[36], openposeData[37], avgX, avgY) / width).toFixed(3));
+    var r_thigh    = parseFloat((magnitude(openposeData[27], openposeData[28], avgX, avgY) / width).toFixed(3));
+    var l_leg      = parseFloat((magnitude(openposeData[39], openposeData[40], avgX, avgY) / width).toFixed(3));
+    var r_leg      = parseFloat((magnitude(openposeData[30], openposeData[31], avgX, avgY) / width).toFixed(3));
+
+    poseData = [l_shoulder, r_shoulder,
+                l_arm, r_arm,
+                l_farm, r_farm,
+                l_spine, r_spine,
+                l_thigh, r_thigh,
+                l_leg, r_leg];
+
+    return poseData;
+
+}
+
+
+//Return relative coords of keypoints
+//[X1, Y1, X2, Y2, ...]
+function extractRelativeCoordinatesJSON(filename) {
+    var jsonData = JSON.parse(fs.readFileSync(filename, 'utf8'));
+
+    if (jsonData.people.length == 0) {
+        return 0;
+    }
+
+    keypoints = JSON.parse(fs.readFileSync(filename, 'utf8')).people[0].pose_keypoints;
+    var keypoints = jsonData.people[0].pose_keypoints;
+    for (var i=3; i<42; i++) {
+        if (keypoints[i] == 0)
+            return 1;
+    }
+
+    //[upper,left,lower,right]
+    var size   = getCropData(filename);
+    // width and height should be equal
+    var width  = size[3] - size[1];
+    var output = [];
+    var coordX, coordY;
+
+    for (var i=3; i<=39; i+=3) {
+        //X
+        coordX = keypoints[i] - size[1];
+        output.push(parseFloat((coordX/width).toFixed(3)));
+        //Y
+        coordY = keypoints[i+1] - size[0]
+        output.push(parseFloat((coordY/width).toFixed(3)));
+    }
+
+    return output;
+}
+
+
+//Returns absolute distance between two (X,Y) coordinates
+function magnitude(x1, y1, x2, y2) {
+    return Math.abs(Math.pow((Math.pow((x2 - x1),2) + Math.pow((y2-y1), 2)), 0.5));
 }
 
 

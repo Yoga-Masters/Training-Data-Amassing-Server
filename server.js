@@ -353,15 +353,271 @@ function runOpenPose(dir, outDir, callback) { // OpenPoseDemo.exe --image_dir [D
 
 // TODO: ALEX, FINISH THIS METHOD; USE THE EXTRACT ANGLES BELOW TO GET STARTED & FOLLOW THE RETURN PATTERN SPECIFIED; I DEPEND ON THAT FOR EVERYTHING ELSE
 function extractData(poseData) {
-    return [
+    var sample = [
         [450, 50, 1450, 1050], //CROP DIMENSIONS
         0, // 0, 1, OR ARRAY OF RELATIVE MAGNITUDES; MAKE CO-ORDINATES RELATIVE TO 0 -> 1, AND THEN FIND MAGNITUDES OF EACH POINTS FROM A AVERAGE POINT OF ALL POINTS
         0, // 0, 1, OR ARRAY OF RELATIVE CO-ORDINATE POSITIONS [X1, Y1, X2, Y2, ..., XN, YN], XN AND YN ARE BETWEEN 0 - 1
         0, // 0, 1, OR ARRAY OF ANGLES BASED ON YOUR OLD METHOD THAT MIGHT BE DIRECTION AGNOSTIC
-        0 // 0, 1, OR ARRAY OF ANGLES BASED ON THE NEW WEBSITE WE FOUND, MAYBE?
+        0] // 0, 1, OR ARRAY OF ANGLES BASED ON THE NEW WEBSITE WE FOUND, MAYBE?
         // ANY OTHER WAYS WE CAN THINK OF GATHERING MEANING FROM OPEN POSE
-    ];
+
+    var output = [[-1, -1, -1, -1], 0, 0, 0];
+
+    //No pose
+    if (poseData.people.length == 0)
+        return output;
+    
+    var keypoints = poseData.people[0].pose_keypoints;
+    var complete = true;
+
+    //Check if pose is incomplete
+    for (var i=3; i<42; i++) {
+        if (keypoints[i] == 0)
+            complete = false;
+    }
+
+    //Get crop data
+    output[0] = getCropData(poseData);
+
+    if (!complete) {
+        return [output[0], 1, 1, 1];
+    }
+    
+    //Relative magnitudes
+    output[1] = extractMagnitudes(keypoints);
+    //Relative coordinates
+    output[2] = extractRelativeCoordinates(keypoints)
+    //Angle relative to vertical line
+    output[3] = extractAngleRelativeToLine(keypoints);
+
+    return output;
 }
+
+
+/*
+Finds cropping dimensions for pose image.
+Inputs keypoints array from a JSON output from openpose
+Returns array of [Upper left X coord, 
+                  Upper left Y coord, 
+                  Lower right X coord.
+                  Lower right Y coord]
+If no pose is found, return -1
+
+Note:
+    Does not guarantee that the coords are within original image dimensions.
+    Pads so the crop dimensions are square.
+    THIS DOES NOT GUARANTEE THAT THE COORDINATES ARE VALID (i.e. negative coords are possible)
+*/
+function getCropData(keypoints) {
+    //No pose is found
+    if (keypoints.length == 0)
+        return 0;
+    //Checks for pose completion
+    for (var i=3; i<42; i++) {
+        if (keypoints[i] == 0)
+            return 1;
+    }
+
+    var upper  = Infinity;
+    var lower = 0;
+    var left   = Infinity;
+    var right  = 0;
+    
+    for (var i=0; i < keypoints.length; i++) {
+        value = keypoints[i];
+        if ((i+3) % 3 === 0) {
+            if (value < left & value != 0)
+                left = value;
+            if (value > right & value != 0)
+                right = value;
+        }
+        if ((i+3) % 3 === 1) {
+            if (value < upper & value != 0)
+                upper = value;
+            if (value > lower & value != 0)
+                lower = value;
+        }
+    }
+    upper = Math.round(upper);
+    lower = Math.round(lower);
+    left  = Math.round(left);
+    right = Math.round( right);
+
+    height = lower - upper;
+    width = right - left;
+
+    //padding
+    if (height > width) {
+        var padding = Math.round((height - width)/2);
+        left  -= padding;
+        right += padding;
+    }
+    else {
+        var padding = Math.round((width - height)/2);
+        upper -= padding;
+        lower += padding;
+    }
+
+    return [upper,left,lower,right];
+}
+
+
+/*
+Input: Keypoint array from Openpose JSON
+       Assumes it's complete and exists
+Output: 0 = no pose
+        1 = incomplete pose
+        Array of scaled magnitudes trimmed to 5 decimal places
+            Scale is magnitude / pose width
+*/
+function extractMagnitudes(keypoints) {
+    //find midpoint (average of all points)
+    var avgX = 0;
+    var avgY = 0;
+
+    for(var i=1; i<=13; i++) {
+        avgX += keypoints[i*3 ];
+        avgY += keypoints[i*3 + 1]
+    }
+    avgX = avgX/13;
+    avgY = avgY/13;
+
+    //[upper,left,lower,right]
+    var size   = getCropData(filename);
+    // width and height should be equal
+    var width  = size[3] - size[1];
+
+    console.log("width, height in pixels " + width + ", " + height)
+    
+    //Trims to 3 decimal places
+    var l_shoulder = parseFloat((magnitude(keypoints[15], keypoints[16], avgX, avgY) / width).toFixed(3));
+    var r_shoulder = parseFloat((magnitude(keypoints[6],  keypoints[7],  avgX, avgY) / width).toFixed(3));
+    var l_arm      = parseFloat((magnitude(keypoints[18], keypoints[19], avgX, avgY) / width).toFixed(3));
+    var r_arm      = parseFloat((magnitude(keypoints[9],  keypoints[10], avgX, avgY) / width).toFixed(3));
+    var l_farm     = parseFloat((magnitude(keypoints[21], keypoints[22], avgX, avgY) / width).toFixed(3));
+    var r_farm     = parseFloat((magnitude(keypoints[12], keypoints[13], avgX, avgY) / width).toFixed(3));
+    var l_spine    = parseFloat((magnitude(keypoints[33], keypoints[34], avgX, avgY) / width).toFixed(3));
+    var r_spine    = parseFloat((magnitude(keypoints[24], keypoints[25], avgX, avgY) / width).toFixed(3));
+    var l_thigh    = parseFloat((magnitude(keypoints[36], keypoints[37], avgX, avgY) / width).toFixed(3));
+    var r_thigh    = parseFloat((magnitude(keypoints[27], keypoints[28], avgX, avgY) / width).toFixed(3));
+    var l_leg      = parseFloat((magnitude(keypoints[39], keypoints[40], avgX, avgY) / width).toFixed(3));
+    var r_leg      = parseFloat((magnitude(keypoints[30], keypoints[31], avgX, avgY) / width).toFixed(3));
+
+    poseData = [l_shoulder, r_shoulder,
+                l_arm, r_arm,
+                l_farm, r_farm,
+                l_spine, r_spine,
+                l_thigh, r_thigh,
+                l_leg, r_leg];
+
+    return poseData;
+}
+
+
+//Returns absolute distance between two (X,Y) coordinates
+function magnitude(x1, y1, x2, y2) {
+    return Math.abs(Math.pow((Math.pow((x2 - x1),2) + Math.pow((y2-y1), 2)), 0.5));
+}
+
+
+function extractAngleRelativeToLine(keypoints) {
+    var l_shoulder =    AngleRelativeToLine(keypoints[3],  keypoints[4],  keypoints[15], keypoints[16]);
+    var r_shoulder =    AngleRelativeToLine(keypoints[3],  keypoints[4],  keypoints[6],  keypoints[7]);
+    var l_arm =         AngleRelativeToLine(keypoints[15], keypoints[16], keypoints[18], keypoints[19]);
+    var r_arm =         AngleRelativeToLine(keypoints[6],  keypoints[7],  keypoints[9],  keypoints[10]);
+    var l_farm =        AngleRelativeToLine(keypoints[18], keypoints[19], keypoints[21], keypoints[22]);
+    var r_farm =        AngleRelativeToLine(keypoints[9],  keypoints[10], keypoints[12], keypoints[13]);
+    var l_spine =       AngleRelativeToLine(keypoints[3],  keypoints[4],  keypoints[33], keypoints[34]);
+    var r_spine =       AngleRelativeToLine(keypoints[3],  keypoints[4],  keypoints[24], keypoints[25]);
+    var l_thigh =       AngleRelativeToLine(keypoints[33], keypoints[34], keypoints[36], keypoints[37]);
+    var r_thigh =       AngleRelativeToLine(keypoints[24], keypoints[25], keypoints[27], keypoints[28]);
+    var l_leg =         AngleRelativeToLine(keypoints[36], keypoints[37], keypoints[39], keypoints[40]);
+    var r_leg =         AngleRelativeToLine(keypoints[27], keypoints[28], keypoints[30], keypoints[31]);
+
+    return [l_shoulder, r_shoulder,
+            l_arm, r_arm,
+            l_farm, r_farm,
+            l_spine, r_spine,
+            l_thigh, r_thigh,
+            l_leg, r_leg];
+}
+
+
+/*
+Returns an angle between two points relative to a straight line going up.
+This makes it so angles can be mirrored easily.
+To mirror angles, swap L/R limbs and multiply by -1
+
+Angle is determined as the following:
+
+    O
+  --+--
+    |
+   / \
+
+Degree  Shape (points 1 and 2)
+-------------
+        2
+0       |
+        1
+-------------
+        | 2
+45      |/
+        1
+-------------
+      2 |
+-45    \|
+        1
+-------------
+        1
+180     |
+        2
+-------------
+        1
+135     |\                 
+        | 2
+-------------
+        1
+-135   /|
+      2 |
+-------------
+*/
+function AngleRelativeToLine(x1, y1, x2, y2) {
+    // Convert points to vectors
+    var vectorX = x2 - x1;
+    var vectorY = y2 - y1;
+    var magnitude = Math.pow((Math.pow(vectorX, 2) + Math.pow(vectorY, 2)), 0.5);
+
+    var angle = Math.round(radiansToDegrees(Math.acos(vectorY / magnitude)));
+
+    //return (x2 > x1) ? angle : (angle >= 180 ? 360 - angle : angle);
+
+    //positive angle if skewed right, negative if left. See comments above ^
+    return (x2 > x1) ? angle : -angle;
+}
+
+
+//Return relative coords of keypoints
+//[X1, Y1, X2, Y2, ...]
+function extractRelativeCoordinates(keypoints) {
+    //[upper,left,lower,right]
+    var size   = getCropData(filename);
+    // width and height should be equal
+    var width  = size[3] - size[1];
+    var output = [];
+    var coordX, coordY;
+
+    for (var i=0; i<=39; i+=3) {
+        //X
+        coordX = keypoints[i] - size[1];
+        output.push(parseFloat((coordX/width).toFixed(3)));
+        //Y
+        coordY = keypoints[i+1] - size[0]
+        output.push(parseFloat((coordY/width).toFixed(3)));
+    }
+    return output;
+}
+
 
 function extractAngles(poseData) {
     var hasPerson = poseData.hasOwnProperty('people') && poseData.people.length > 0;
