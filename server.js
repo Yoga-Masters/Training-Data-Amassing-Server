@@ -173,6 +173,9 @@ function handleAppDataUpdating(user, ext, time) {
         console.log("Finished reading file " + user + " json after " + (Date.now() - time) + "ms. Processing image...");
         if(!data) return;
         var openPoseData = extractData(JSON.parse(data));
+
+        console.log(openPoseData);
+
         if (openPoseData[1] == 0 || openPoseData[1] == 1)
             updateAppData(user, openPoseData, {}, time);
         else imageProcessing("./processing/pictures/" + user + "." + ext, openPoseData[0][0], openPoseData[0][1], openPoseData[0][2], openPoseData[0][3], (err, trainingImage) => {
@@ -377,10 +380,10 @@ function extractData(poseData) {
     }
 
     //Get crop data
-    output[0] = getCropData(poseData);
+    output[0] = getCropData(keypoints);
 
     if (!complete) {
-        return [output[0], 1, 1, 1];
+        return [[280, 0, 1000, 720], 1, 1, 1];
     }
     
     //Relative magnitudes
@@ -411,12 +414,12 @@ Note:
 function getCropData(keypoints) {
     //No pose is found
     if (keypoints.length == 0)
-        return 0;
+        return [280, 0, 1000, 720];
     //Checks for pose completion
-    for (var i=3; i<42; i++) {
-        if (keypoints[i] == 0)
-            return 1;
-    }
+    // for (var i=3; i<42; i++) {
+    //     if (keypoints[i] == 0)
+    //         return 1;
+    // }
 
     var upper  = Infinity;
     var lower = 0;
