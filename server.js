@@ -1,4 +1,5 @@
 // cls && browser-sync start --proxy localhost:80 --files "**/*" && ngrok http --bind-tls "both" 80 | npm start
+// cls && browser-sync start --proxy localhost:80 --files "**/*" && ngrok http --bind-tls "both" 80 | npm start
 // ============================ PACKAGES SETUP =================================
 const fs = require('fs');
 const jimp = require("jimp");
@@ -170,6 +171,7 @@ app.get('/api/redownload', (req, res) => {
 function handleAppDataUpdating(user, ext, time) {
     fs.readFile("./processing/pictures/processed/" + user + "_keypoints.json", 'utf8', (err, data) => {
         console.log("Finished reading file " + user + " json after " + (Date.now() - time) + "ms. Processing image...");
+        if(!data) return;
         var openPoseData = extractData(JSON.parse(data));
         if (openPoseData[1] == 0 || openPoseData[1] == 1)
             updateAppData(user, openPoseData, {}, time);
