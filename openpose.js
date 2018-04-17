@@ -28,12 +28,14 @@ function main() {
         files.forEach(function(file, index) {
             //calculate angle
             var filename = './output/' + file.slice(0, -4) + '_keypoints.json';
-            var poseData     = extractAnglesFromJson(filename);
-            var openposeData = extractMagnitudesJSON(filename);
+            var poseData      = extractAnglesFromJson(filename);
+            var magnitudeData = extractMagnitudesJSON(filename);
+            var coordData     = extractRelativeCoordinatesJSON(filename);
 
             console.log(filename);
-            console.log(poseData);
+            //console.log(poseData);
             //console.log(magnitudeData);
+            console.log(coordData);
             console.log("\n");
         });
     });
@@ -178,14 +180,12 @@ function extractAnglesFromJson(filename) {
         //9-10
         var r_leg =         getAngleRelativeToLine(keypoints[27], keypoints[28], keypoints[30], keypoints[31]);
 
-        var output = [l_shoulder, r_shoulder,
-                      l_arm, r_arm,
-                      l_farm, r_farm,
-                      l_spine, r_spine,
-                      l_thigh, r_thigh,
-                      l_leg, r_leg];
-
-        return output;
+        return [l_shoulder, r_shoulder,
+                l_arm, r_arm,
+                l_farm, r_farm,
+                l_spine, r_spine,
+                l_thigh, r_thigh,
+                l_leg, r_leg];
     }
 }
 
@@ -224,7 +224,7 @@ function getCropData(filename) {
     var jsonData = JSON.parse(fs.readFileSync(filename, 'utf8'));
     //missing pose
     if (jsonData.people.length == 0)
-        return -1
+        return 0
 
     //get coords
     var upper  = Infinity;
@@ -371,62 +371,92 @@ function extractMagnitudesJSON(filename) {
     var poseData = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1];
 
     if (jsonData.people.length == 0) {
-        //console.log("No pose detected");
-        //console.log("Pose data for: " + filename);
-        //console.log(poseData);
-        //console.log();
         return 0;
     }
-    else {
-        openposeData = JSON.parse(fs.readFileSync(filename, 'utf8')).people[0].pose_keypoints;
-        var keypoints = jsonData.people[0].pose_keypoints;
-        for (var i=3; i<42; i++) {
-            if (keypoints[i] == 0)
-                return 1;
-        }
-        openposeData = JSON.parse(fs.readFileSync(filename, 'utf8')).people[0].pose_keypoints;
-
-        //find midpoint (average of all points)
-        var avgX = 0;
-        var avgY = 0;
-
-        for(var i=1; i<=13; i++) {
-            avgX += openposeData[i*3 ];
-            avgY += openposeData[i*3 + 1]
-        }
-        avgX = avgX/13;
-        avgY = avgY/13;
-
-        //[upper,left,lower,right]
-        var size   = getCropData(filename);
-        // width and height should be equal
-        var width  = size[3] - size[1];
-
-        console.log("width, height in pixels " + width + ", " + height)
-        
-        //Trims to 5 decimal places
-        var l_shoulder = parseFloat((magnitude(openposeData[15], openposeData[16], avgX, avgY) / width).toFixed(5));
-        var r_shoulder = parseFloat((magnitude(openposeData[6],  openposeData[7],  avgX, avgY) / width).toFixed(5));
-        var l_arm      = parseFloat((magnitude(openposeData[18], openposeData[19], avgX, avgY) / width).toFixed(5));
-        var r_arm      = parseFloat((magnitude(openposeData[9],  openposeData[10], avgX, avgY) / width).toFixed(5));
-        var l_farm     = parseFloat((magnitude(openposeData[21], openposeData[22], avgX, avgY) / width).toFixed(5));
-        var r_farm     = parseFloat((magnitude(openposeData[12], openposeData[13], avgX, avgY) / width).toFixed(5));
-        var l_spine    = parseFloat((magnitude(openposeData[33], openposeData[34], avgX, avgY) / width).toFixed(5));
-        var r_spine    = parseFloat((magnitude(openposeData[24], openposeData[25], avgX, avgY) / width).toFixed(5));
-        var l_thigh    = parseFloat((magnitude(openposeData[36], openposeData[37], avgX, avgY) / width).toFixed(5));
-        var r_thigh    = parseFloat((magnitude(openposeData[27], openposeData[28], avgX, avgY) / width).toFixed(5));
-        var l_leg      = parseFloat((magnitude(openposeData[39], openposeData[40], avgX, avgY) / width).toFixed(5));
-        var r_leg      = parseFloat((magnitude(openposeData[30], openposeData[31], avgX, avgY) / width).toFixed(5));
-
-        poseData = [l_shoulder, r_shoulder,
-                    l_arm, r_arm,
-                    l_farm, r_farm,
-                    l_spine, r_spine,
-                    l_thigh, r_thigh,
-                    l_leg, r_leg];
-
-        return poseData;
+    openposeData = JSON.parse(fs.readFileSync(filename, 'utf8')).people[0].pose_keypoints;
+    var keypoints = jsonData.people[0].pose_keypoints;
+    for (var i=3; i<42; i++) {
+        if (keypoints[i] == 0)
+            return 1;
     }
+
+    //find midpoint (average of all points)
+    var avgX = 0;
+    var avgY = 0;
+
+    for(var i=1; i<=13; i++) {
+        avgX += openposeData[i*3 ];
+        avgY += openposeData[i*3 + 1]
+    }
+    avgX = avgX/13;
+    avgY = avgY/13;
+
+    //[upper,left,lower,right]
+    var size   = getCropData(filename);
+    // width and height should be equal
+    var width  = size[3] - size[1];
+
+    console.log("width, height in pixels " + width + ", " + height)
+    
+    //Trims to 5 decimal places
+    var l_shoulder = parseFloat((magnitude(openposeData[15], openposeData[16], avgX, avgY) / width).toFixed(3));
+    var r_shoulder = parseFloat((magnitude(openposeData[6],  openposeData[7],  avgX, avgY) / width).toFixed(3));
+    var l_arm      = parseFloat((magnitude(openposeData[18], openposeData[19], avgX, avgY) / width).toFixed(3));
+    var r_arm      = parseFloat((magnitude(openposeData[9],  openposeData[10], avgX, avgY) / width).toFixed(3));
+    var l_farm     = parseFloat((magnitude(openposeData[21], openposeData[22], avgX, avgY) / width).toFixed(3));
+    var r_farm     = parseFloat((magnitude(openposeData[12], openposeData[13], avgX, avgY) / width).toFixed(3));
+    var l_spine    = parseFloat((magnitude(openposeData[33], openposeData[34], avgX, avgY) / width).toFixed(3));
+    var r_spine    = parseFloat((magnitude(openposeData[24], openposeData[25], avgX, avgY) / width).toFixed(3));
+    var l_thigh    = parseFloat((magnitude(openposeData[36], openposeData[37], avgX, avgY) / width).toFixed(3));
+    var r_thigh    = parseFloat((magnitude(openposeData[27], openposeData[28], avgX, avgY) / width).toFixed(3));
+    var l_leg      = parseFloat((magnitude(openposeData[39], openposeData[40], avgX, avgY) / width).toFixed(3));
+    var r_leg      = parseFloat((magnitude(openposeData[30], openposeData[31], avgX, avgY) / width).toFixed(3));
+
+    poseData = [l_shoulder, r_shoulder,
+                l_arm, r_arm,
+                l_farm, r_farm,
+                l_spine, r_spine,
+                l_thigh, r_thigh,
+                l_leg, r_leg];
+
+    return poseData;
+
+}
+
+
+//Return relative coords of keypoints
+//[X1, Y1, X2, Y2, ...]
+function extractRelativeCoordinatesJSON(filename) {
+    var jsonData = JSON.parse(fs.readFileSync(filename, 'utf8'));
+
+    if (jsonData.people.length == 0) {
+        return 0;
+    }
+
+    keypoints = JSON.parse(fs.readFileSync(filename, 'utf8')).people[0].pose_keypoints;
+    var keypoints = jsonData.people[0].pose_keypoints;
+    for (var i=3; i<42; i++) {
+        if (keypoints[i] == 0)
+            return 1;
+    }
+
+    //[upper,left,lower,right]
+    var size   = getCropData(filename);
+    // width and height should be equal
+    var width  = size[3] - size[1];
+    var output = [];
+    var coordX, coordY;
+
+    for (var i=3; i<=39; i+=3) {
+        //X
+        coordX = keypoints[i] - size[1];
+        output.push(parseFloat((coordX/width).toFixed(3)));
+        //Y
+        coordY = keypoints[i+1] - size[0]
+        output.push(parseFloat((coordY/width).toFixed(3)));
+    }
+
+    return output;
 }
 
 
