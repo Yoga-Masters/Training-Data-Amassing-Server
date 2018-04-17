@@ -359,7 +359,7 @@ function extractData(poseData) {
         0] // 0, 1, OR ARRAY OF ANGLES BASED ON THE NEW WEBSITE WE FOUND, MAYBE?
         // ANY OTHER WAYS WE CAN THINK OF GATHERING MEANING FROM OPEN POSE
 
-    var output = [[-1, -1, -1, -1], 0, 0, 0];
+    var output = [[280, 0, 1000, 720], 0, 0, 0];
 
     //No pose
     if (poseData.people.length == 0)
@@ -481,7 +481,7 @@ function extractMagnitudes(keypoints) {
     avgY = avgY/13;
 
     //[upper,left,lower,right]
-    var size   = getCropData(filename);
+    var size   = getCropData(keypoints);
     // width and height should be equal
     var width  = size[3] - size[1];
 
@@ -599,7 +599,7 @@ function AngleRelativeToLine(x1, y1, x2, y2) {
 //[X1, Y1, X2, Y2, ...]
 function extractRelativeCoordinates(keypoints) {
     //[upper,left,lower,right]
-    var size   = getCropData(filename);
+    var size   = getCropData(keypoints);
     // width and height should be equal
     var width  = size[3] - size[1];
     var output = [];
@@ -641,6 +641,7 @@ function extractAngles(poseData) {
 }
 
 function imageProcessing(path, x1, y1, x2, y2, cb) {
+    console.log(x1, y1, x2, y2);
     jimp.read(path, (err, image) => {
         background.resize((x2 - x1), (y2 - y1)) // Resizes the 1x1 Gray to the size we need it
             .composite(image, -x1, -y1) //Composite the image to have no Grey
