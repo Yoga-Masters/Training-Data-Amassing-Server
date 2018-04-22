@@ -1,19 +1,19 @@
 // cls && browser-sync start --proxy localhost:80 --files "**/*" && ngrok http --bind-tls "both" 80 | npm start
-// cls && browser-sync start --proxy localhost:80 --files "**/*" && ngrok http --bind-tls "both" 80 | npm start
+// clear && browser-sync start --proxy localhost:8080 --port 8081 --files "**/*" | npm start
 // ============================ PACKAGES SETUP =================================
 const fs = require('fs');
-const jimp = require("jimp");
+const jimp = require('jimp');
 const http = require('http');
 const path = require('path');
 const cors = require('cors');
 const rimraf = require('rimraf');
-const crypto = require("crypto");
+const crypto = require('crypto');
 const ytdl = require('ytdl-core');
 const request = require('request');
 const express = require('express');
-const admin = require("firebase-admin");
+const admin = require('firebase-admin');
 const lineReader = require('line-reader');
-const bodyParser = require("body-parser");
+const bodyParser = require('body-parser');
 const stringify = require('csv-stringify');
 const exec = require('child_process').execFile;
 const removeDirectories = require('remove-empty-directories');
