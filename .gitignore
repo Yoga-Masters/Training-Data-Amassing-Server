@@ -70,3 +70,7 @@ models/
 .dll
 
 .exe
+
+client/*.csv
+
+training_data.js
