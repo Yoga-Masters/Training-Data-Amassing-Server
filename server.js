@@ -371,53 +371,32 @@ function runOpenPose(dir, outDir, callback) { // OpenPoseDemo.exe --image_dir [D
     });
 }
 
-// TODO: ALEX, FINISH THIS METHOD; USE THE EXTRACT ANGLES BELOW TO GET STARTED & FOLLOW THE RETURN PATTERN SPECIFIED; I DEPEND ON THAT FOR EVERYTHING ELSE
 function extractData(poseData) {
-    var sample = [
-        [450, 50, 1450, 1050], //CROP DIMENSIONS
+    var output = [
+        [280, 0, 1000, 720], //DEFAULT CROP DIMENSIONS
         0, // 0, 1, OR ARRAY OF RELATIVE MAGNITUDES; MAKE CO-ORDINATES RELATIVE TO 0 -> 1, AND THEN FIND MAGNITUDES OF EACH POINTS FROM A AVERAGE POINT OF ALL POINTS
         0, // 0, 1, OR ARRAY OF RELATIVE CO-ORDINATE POSITIONS [X1, Y1, X2, Y2, ..., XN, YN], XN AND YN ARE BETWEEN 0 - 1
         0, // 0, 1, OR ARRAY OF ANGLES BASED ON YOUR OLD METHOD THAT MIGHT BE DIRECTION AGNOSTIC
-        0
-    ] // 0, 1, OR ARRAY OF ANGLES BASED ON THE NEW WEBSITE WE FOUND, MAYBE?
-    // ANY OTHER WAYS WE CAN THINK OF GATHERING MEANING FROM OPEN POSE
-
-    var output = [
-        [280, 0, 1000, 720], 0, 0, 0
+        0 // 0, 1, OR ARRAY OF ANGLES AND MAGNITUDES CONCATENATED
+        //0, // ANY OTHER WAYS WE CAN THINK OF GATHERING MEANING FROM OPEN POSE, MAYBE ANGLES BASED ON THE NEW WEBSITE WE FOUND?
     ];
-
-    //No pose
-    if (poseData.people.length == 0)
-        return output;
-
-    var keypoints = poseData.people[0].pose_keypoints;
-    var complete = true;
-
-    //Check if pose is incomplete
-    for (var i = 3; i < 42; i++) {
-        if (keypoints[i] == 0)
-            complete = false;
+    if (poseData.people.length == 0) return output; // Nobody in frame
+    output[1] = output[2] = output[3] = output[4] = 1;
+    var personIndex = -1;
+    for (var p = poseData.people.length - 1; p > -1; p--) {
+        personIndex = p;
+        for (var i = 3; i < 42; i++) // Change personIndex back to -1 if person data is incomplete 
+            if (poseData.people[p].pose_keypoints[i] == 0) personIndex = -1;
     }
-
-    //Get crop data
-    output[0] = getCropData(keypoints);
-
-    if (!complete) {
-        return [
-            [280, 0, 1000, 720], 1, 1, 1
-        ];
-    }
-
-    //Relative magnitudes
-    output[1] = extractMagnitudes(keypoints);
-    //Relative coordinates
-    output[2] = extractRelativeCoordinates(keypoints)
-    //Angle relative to vertical line
-    output[3] = extractAngleRelativeToLine(keypoints);
-
+    if (personIndex == -1) return output;
+    var keypoints = poseData.people[personIndex].pose_keypoints; // TODO: THINK ABOUT HOW TO DEAL WITH MULTIPLE PEOPLE IN FRAME
+    output[0] = getCropData(keypoints); //Get crop data
+    output[1] = extractMagnitudes(keypoints); //Relative magnitudes
+    output[2] = extractRelativeCoordinates(keypoints); //Relative coordinates
+    output[3] = extractAngleRelativeToLine(keypoints); //Angle relative to vertical line
+    output[4] = output[3].concat(output[1]); //Concat of relative angles to vertical line and relative magnitudes
     return output;
 }
-
 
 /*
 Finds cropping dimensions for pose image.
@@ -687,7 +666,7 @@ function flipImage(path, ext, cb) {
     });
 }
 
-function openPoseFrameProcessing(path, cb) { // TODO: Try to crop it to the actual image using the aspect ratio of the old image; currently assuming max height as 100px
+function openPoseFrameProcessing(path, cb) {
     jimp.read(path, (err, image) => {
         image.resize(jimp.AUTO, size)
             .quality(100)
