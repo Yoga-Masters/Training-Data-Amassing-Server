@@ -1,5 +1,6 @@
 // cls && browser-sync start --proxy localhost:80 --files "**/*" && ngrok http --bind-tls "both" 80 | npm start
 // clear && browser-sync start --proxy localhost:8080 --port 8081 --files "**/*" | npm start
+// cls && browser-sync start --proxy localhost:80 --files "**/*" | npm start
 // ============================ PACKAGES SETUP =================================
 const fs = require('fs');
 const jimp = require('jimp');
@@ -172,7 +173,7 @@ app.get('/api/redownload', (req, res) => {
 function handleAppDataUpdating(user, ext, time) {
     fs.readFile("./processing/pictures/processed/" + user + "_keypoints.json", 'utf8', (err, data) => {
         console.log("Finished reading file " + user + " json after " + (Date.now() - time) + "ms. Processing image...");
-        if(!data) return;
+        if (!data) return;
         var openPoseData = extractData(JSON.parse(data));
         if (openPoseData[1] == 0 || openPoseData[1] == 1)
             updateAppData(user, openPoseData, {}, time);
@@ -244,30 +245,49 @@ function convertToFrames(framesDict, id, folder, fps) { // ffmpeg -i video.mp4 -
         ], (error, stdout, stderr) => {
             completion[pose] = true;
             console.log("Finished " + pose + " pose for " + id + " @ " + folder + " in " + (Date.now() - time) + "ms!");
-            checkFramesComplete(completion, id, folder, time);
+            checkFramesCompleteAndFlip(completion, id, folder, time);
         });
     }
 }
 
-function checkFramesComplete(check, video, folder, time) {
+function checkFramesCompleteAndFlip(check, video, folder, time) {
     for (const pose of Object.keys(check))
         if (!check[pose]) return;
-    console.log("All frames for video " + video + " at folder " + folder + " have been extracted after " + (Date.now() - time) + "ms! Running Openpose on them...");
-    runOpenPose("./processing/videos/" + video + "/" + folder, "", () => {
-        processFrames(video, folder)
-    });
-}
-
-function processFrames(video, folder) {
-    var time = Date.now();
+    var completion = {};
+    console.log("All frames for video " + video + " at folder " + folder + " have been extracted after " + (Date.now() - time) + "ms! Flipping then Running Openpose on them...");
     fs.readdir("./processing/videos/" + video + "/" + folder, (err, files) => {
         files.forEach(file => {
             if (path.extname(file) != ".jpg") return;
             file = file.slice(0, -(".jpg".length));
-            console.log("Processing file " + file + " after " + (Date.now() - time) + "ms...");
-            fs.readFile("./processing/videos/" + video + "/" + folder + "/" + file + "_keypoints.json", 'utf8', (err, data) => {
-                console.log("Finished reading file " + file + " json after " + (Date.now() - time) + "ms. Processing images...");
-                uploadFrameData(video, folder, file, extractData(JSON.parse(data)), time);
+            completion[file] = false;
+        });
+        files.forEach(file => {
+            if (path.extname(file) != ".jpg") return;
+            file = file.slice(0, -(".jpg".length));
+            console.log("Flipping image " + file + ".jpg after " + (Date.now() - time) + "ms...");
+            flipImage("./processing/videos/" + video + "/" + folder + "/" + file, ".jpg", () => {
+                console.log("Finished flipping " + file + ".jpg after " + (Date.now() - time) + "ms!");
+                completion[file] = true;
+                processFrames(video, folder, completion);
+            });
+        });
+    });
+}
+
+function processFrames(video, folder, check) {
+    for (const flip of Object.keys(check))
+        if (!check[flip]) return;
+    var time = Date.now();
+    runOpenPose("./processing/videos/" + video + "/" + folder, "", () => {
+        fs.readdir("./processing/videos/" + video + "/" + folder, (err, files) => {
+            files.forEach(file => {
+                if (path.extname(file) != ".jpg") return;
+                file = file.slice(0, -(".jpg".length));
+                console.log("Processing file " + file + " after " + (Date.now() - time) + "ms...");
+                fs.readFile("./processing/videos/" + video + "/" + folder + "/" + file + "_keypoints.json", 'utf8', (err, data) => {
+                    console.log("Finished reading file " + file + " json after " + (Date.now() - time) + "ms. Processing images...");
+                    uploadFrameData(video, folder, file, extractData(JSON.parse(data)), time);
+                });
             });
         });
     });
@@ -352,48 +372,32 @@ function runOpenPose(dir, outDir, callback) { // OpenPoseDemo.exe --image_dir [D
     });
 }
 
-// TODO: ALEX, FINISH THIS METHOD; USE THE EXTRACT ANGLES BELOW TO GET STARTED & FOLLOW THE RETURN PATTERN SPECIFIED; I DEPEND ON THAT FOR EVERYTHING ELSE
 function extractData(poseData) {
-    var sample = [
-        [450, 50, 1450, 1050], //CROP DIMENSIONS
+    var output = [
+        [280, 0, 1000, 720], //DEFAULT CROP DIMENSIONS
         0, // 0, 1, OR ARRAY OF RELATIVE MAGNITUDES; MAKE CO-ORDINATES RELATIVE TO 0 -> 1, AND THEN FIND MAGNITUDES OF EACH POINTS FROM A AVERAGE POINT OF ALL POINTS
         0, // 0, 1, OR ARRAY OF RELATIVE CO-ORDINATE POSITIONS [X1, Y1, X2, Y2, ..., XN, YN], XN AND YN ARE BETWEEN 0 - 1
         0, // 0, 1, OR ARRAY OF ANGLES BASED ON YOUR OLD METHOD THAT MIGHT BE DIRECTION AGNOSTIC
-        0] // 0, 1, OR ARRAY OF ANGLES BASED ON THE NEW WEBSITE WE FOUND, MAYBE?
-        // ANY OTHER WAYS WE CAN THINK OF GATHERING MEANING FROM OPEN POSE
-
-    var output = [[280, 0, 1000, 720], 0, 0, 0];
-
-    //No pose
-    if (poseData.people.length == 0)
-        return output;
-    
-    var keypoints = poseData.people[0].pose_keypoints;
-    var complete = true;
-
-    //Check if pose is incomplete
-    for (var i=3; i<42; i++) {
-        if (keypoints[i] == 0)
-            complete = false;
+        0 // 0, 1, OR ARRAY OF ANGLES AND MAGNITUDES CONCATENATED
+        //0, // ANY OTHER WAYS WE CAN THINK OF GATHERING MEANING FROM OPEN POSE, MAYBE ANGLES BASED ON THE NEW WEBSITE WE FOUND?
+    ];
+    if (poseData.people.length == 0) return output; // Nobody in frame
+    output[1] = output[2] = output[3] = output[4] = 1;
+    var personIndex = -1;
+    for (var p = poseData.people.length - 1; p > -1; p--) {
+        personIndex = p;
+        for (var i = 3; i < 42; i++) // Change personIndex back to -1 if person data is incomplete 
+            if (poseData.people[p].pose_keypoints[i] == 0) personIndex = -1;
     }
-
-    //Get crop data
-    output[0] = getCropData(keypoints);
-
-    if (!complete) {
-        return [[280, 0, 1000, 720], 1, 1, 1];
-    }
-    
-    //Relative magnitudes
-    output[1] = extractMagnitudes(keypoints);
-    //Relative coordinates
-    output[2] = extractRelativeCoordinates(keypoints)
-    //Angle relative to vertical line
-    output[3] = extractAngleRelativeToLine(keypoints);
-
+    if (personIndex == -1) return output;
+    var keypoints = poseData.people[personIndex].pose_keypoints; // TODO: THINK ABOUT HOW TO DEAL WITH MULTIPLE PEOPLE IN FRAME
+    output[0] = getCropData(keypoints); //Get crop data
+    output[1] = extractMagnitudes(keypoints); //Relative magnitudes
+    output[2] = extractRelativeCoordinates(keypoints); //Relative coordinates
+    output[3] = extractAngleRelativeToLine(keypoints); //Angle relative to vertical line
+    output[4] = output[3].concat(output[1]); //Concat of relative angles to vertical line and relative magnitudes
     return output;
 }
-
 
 /*
 Finds cropping dimensions for pose image.
@@ -419,20 +423,20 @@ function getCropData(keypoints) {
     //         return 1;
     // }
 
-    var upper  = Infinity;
+    var upper = Infinity;
     var lower = 0;
-    var left   = Infinity;
-    var right  = 0;
-    
-    for (var i=0; i < keypoints.length; i++) {
+    var left = Infinity;
+    var right = 0;
+
+    for (var i = 0; i < keypoints.length; i++) {
         value = keypoints[i];
-        if ((i+3) % 3 === 0) {
+        if ((i + 3) % 3 === 0) {
             if (value < left & value != 0)
                 left = value;
             if (value > right & value != 0)
                 right = value;
         }
-        if ((i+3) % 3 === 1) {
+        if ((i + 3) % 3 === 1) {
             if (value < upper & value != 0)
                 upper = value;
             if (value > lower & value != 0)
@@ -441,25 +445,24 @@ function getCropData(keypoints) {
     }
     upper = Math.round(upper);
     lower = Math.round(lower);
-    left  = Math.round(left);
-    right = Math.round( right);
+    left = Math.round(left);
+    right = Math.round(right);
 
     height = lower - upper;
     width = right - left;
 
     //padding
     if (height > width) {
-        var padding = Math.round((height - width)/2);
-        left  -= padding;
+        var padding = Math.round((height - width) / 2);
+        left -= padding;
         right += padding;
-    }
-    else {
-        var padding = Math.round((width - height)/2);
+    } else {
+        var padding = Math.round((width - height) / 2);
         upper -= padding;
         lower += padding;
     }
 
-    return [upper,left,lower,right];
+    return [upper, left, lower, right];
 }
 
 
@@ -476,40 +479,41 @@ function extractMagnitudes(keypoints) {
     var avgX = 0;
     var avgY = 0;
 
-    for(var i=1; i<=13; i++) {
-        avgX += keypoints[i*3 ];
-        avgY += keypoints[i*3 + 1]
+    for (var i = 1; i <= 13; i++) {
+        avgX += keypoints[i * 3];
+        avgY += keypoints[i * 3 + 1]
     }
-    avgX = avgX/13;
-    avgY = avgY/13;
+    avgX = avgX / 13;
+    avgY = avgY / 13;
 
     //[upper,left,lower,right]
-    var size   = getCropData(keypoints);
+    var size = getCropData(keypoints);
     // width and height should be equal
-    var width  = size[3] - size[1];
+    var width = size[3] - size[1];
 
     console.log("width, height in pixels " + width + ", " + height)
-    
+
     //Trims to 3 decimal places
     var l_shoulder = parseFloat((magnitude(keypoints[15], keypoints[16], avgX, avgY) / width).toFixed(3));
-    var r_shoulder = parseFloat((magnitude(keypoints[6],  keypoints[7],  avgX, avgY) / width).toFixed(3));
-    var l_arm      = parseFloat((magnitude(keypoints[18], keypoints[19], avgX, avgY) / width).toFixed(3));
-    var r_arm      = parseFloat((magnitude(keypoints[9],  keypoints[10], avgX, avgY) / width).toFixed(3));
-    var l_farm     = parseFloat((magnitude(keypoints[21], keypoints[22], avgX, avgY) / width).toFixed(3));
-    var r_farm     = parseFloat((magnitude(keypoints[12], keypoints[13], avgX, avgY) / width).toFixed(3));
-    var l_spine    = parseFloat((magnitude(keypoints[33], keypoints[34], avgX, avgY) / width).toFixed(3));
-    var r_spine    = parseFloat((magnitude(keypoints[24], keypoints[25], avgX, avgY) / width).toFixed(3));
-    var l_thigh    = parseFloat((magnitude(keypoints[36], keypoints[37], avgX, avgY) / width).toFixed(3));
-    var r_thigh    = parseFloat((magnitude(keypoints[27], keypoints[28], avgX, avgY) / width).toFixed(3));
-    var l_leg      = parseFloat((magnitude(keypoints[39], keypoints[40], avgX, avgY) / width).toFixed(3));
-    var r_leg      = parseFloat((magnitude(keypoints[30], keypoints[31], avgX, avgY) / width).toFixed(3));
+    var r_shoulder = parseFloat((magnitude(keypoints[6], keypoints[7], avgX, avgY) / width).toFixed(3));
+    var l_arm = parseFloat((magnitude(keypoints[18], keypoints[19], avgX, avgY) / width).toFixed(3));
+    var r_arm = parseFloat((magnitude(keypoints[9], keypoints[10], avgX, avgY) / width).toFixed(3));
+    var l_farm = parseFloat((magnitude(keypoints[21], keypoints[22], avgX, avgY) / width).toFixed(3));
+    var r_farm = parseFloat((magnitude(keypoints[12], keypoints[13], avgX, avgY) / width).toFixed(3));
+    var l_spine = parseFloat((magnitude(keypoints[33], keypoints[34], avgX, avgY) / width).toFixed(3));
+    var r_spine = parseFloat((magnitude(keypoints[24], keypoints[25], avgX, avgY) / width).toFixed(3));
+    var l_thigh = parseFloat((magnitude(keypoints[36], keypoints[37], avgX, avgY) / width).toFixed(3));
+    var r_thigh = parseFloat((magnitude(keypoints[27], keypoints[28], avgX, avgY) / width).toFixed(3));
+    var l_leg = parseFloat((magnitude(keypoints[39], keypoints[40], avgX, avgY) / width).toFixed(3));
+    var r_leg = parseFloat((magnitude(keypoints[30], keypoints[31], avgX, avgY) / width).toFixed(3));
 
     poseData = [l_shoulder, r_shoulder,
-                l_arm, r_arm,
-                l_farm, r_farm,
-                l_spine, r_spine,
-                l_thigh, r_thigh,
-                l_leg, r_leg];
+        l_arm, r_arm,
+        l_farm, r_farm,
+        l_spine, r_spine,
+        l_thigh, r_thigh,
+        l_leg, r_leg
+    ];
 
     return poseData;
 }
@@ -517,30 +521,31 @@ function extractMagnitudes(keypoints) {
 
 //Returns absolute distance between two (X,Y) coordinates
 function magnitude(x1, y1, x2, y2) {
-    return Math.abs(Math.pow((Math.pow((x2 - x1),2) + Math.pow((y2-y1), 2)), 0.5));
+    return Math.abs(Math.pow((Math.pow((x2 - x1), 2) + Math.pow((y2 - y1), 2)), 0.5));
 }
 
 
 function extractAngleRelativeToLine(keypoints) {
-    var l_shoulder =    AngleRelativeToLine(keypoints[3],  keypoints[4],  keypoints[15], keypoints[16]);
-    var r_shoulder =    AngleRelativeToLine(keypoints[3],  keypoints[4],  keypoints[6],  keypoints[7]);
-    var l_arm =         AngleRelativeToLine(keypoints[15], keypoints[16], keypoints[18], keypoints[19]);
-    var r_arm =         AngleRelativeToLine(keypoints[6],  keypoints[7],  keypoints[9],  keypoints[10]);
-    var l_farm =        AngleRelativeToLine(keypoints[18], keypoints[19], keypoints[21], keypoints[22]);
-    var r_farm =        AngleRelativeToLine(keypoints[9],  keypoints[10], keypoints[12], keypoints[13]);
-    var l_spine =       AngleRelativeToLine(keypoints[3],  keypoints[4],  keypoints[33], keypoints[34]);
-    var r_spine =       AngleRelativeToLine(keypoints[3],  keypoints[4],  keypoints[24], keypoints[25]);
-    var l_thigh =       AngleRelativeToLine(keypoints[33], keypoints[34], keypoints[36], keypoints[37]);
-    var r_thigh =       AngleRelativeToLine(keypoints[24], keypoints[25], keypoints[27], keypoints[28]);
-    var l_leg =         AngleRelativeToLine(keypoints[36], keypoints[37], keypoints[39], keypoints[40]);
-    var r_leg =         AngleRelativeToLine(keypoints[27], keypoints[28], keypoints[30], keypoints[31]);
+    var l_shoulder = AngleRelativeToLine(keypoints[3], keypoints[4], keypoints[15], keypoints[16]);
+    var r_shoulder = AngleRelativeToLine(keypoints[3], keypoints[4], keypoints[6], keypoints[7]);
+    var l_arm = AngleRelativeToLine(keypoints[15], keypoints[16], keypoints[18], keypoints[19]);
+    var r_arm = AngleRelativeToLine(keypoints[6], keypoints[7], keypoints[9], keypoints[10]);
+    var l_farm = AngleRelativeToLine(keypoints[18], keypoints[19], keypoints[21], keypoints[22]);
+    var r_farm = AngleRelativeToLine(keypoints[9], keypoints[10], keypoints[12], keypoints[13]);
+    var l_spine = AngleRelativeToLine(keypoints[3], keypoints[4], keypoints[33], keypoints[34]);
+    var r_spine = AngleRelativeToLine(keypoints[3], keypoints[4], keypoints[24], keypoints[25]);
+    var l_thigh = AngleRelativeToLine(keypoints[33], keypoints[34], keypoints[36], keypoints[37]);
+    var r_thigh = AngleRelativeToLine(keypoints[24], keypoints[25], keypoints[27], keypoints[28]);
+    var l_leg = AngleRelativeToLine(keypoints[36], keypoints[37], keypoints[39], keypoints[40]);
+    var r_leg = AngleRelativeToLine(keypoints[27], keypoints[28], keypoints[30], keypoints[31]);
 
     return [l_shoulder, r_shoulder,
-            l_arm, r_arm,
-            l_farm, r_farm,
-            l_spine, r_spine,
-            l_thigh, r_thigh,
-            l_leg, r_leg];
+        l_arm, r_arm,
+        l_farm, r_farm,
+        l_spine, r_spine,
+        l_thigh, r_thigh,
+        l_leg, r_leg
+    ];
 }
 
 
@@ -602,19 +607,19 @@ function AngleRelativeToLine(x1, y1, x2, y2) {
 //[X1, Y1, X2, Y2, ...]
 function extractRelativeCoordinates(keypoints) {
     //[upper,left,lower,right]
-    var size   = getCropData(keypoints);
+    var size = getCropData(keypoints);
     // width and height should be equal
-    var width  = size[3] - size[1];
+    var width = size[3] - size[1];
     var output = [];
     var coordX, coordY;
 
-    for (var i=0; i<=39; i+=3) {
+    for (var i = 0; i <= 39; i += 3) {
         //X
         coordX = keypoints[i] - size[1];
-        output.push(parseFloat((coordX/width).toFixed(3)));
+        output.push(parseFloat((coordX / width).toFixed(3)));
         //Y
-        coordY = keypoints[i+1] - size[0]
-        output.push(parseFloat((coordY/width).toFixed(3)));
+        coordY = keypoints[i + 1] - size[0]
+        output.push(parseFloat((coordY / width).toFixed(3)));
     }
     return output;
 }
@@ -655,7 +660,14 @@ function imageProcessing(path, x1, y1, x2, y2, cb) {
     });
 }
 
-function openPoseFrameProcessing(path, cb) { // TODO: Try to crop it to the actual image using the aspect ratio of the old image; currently assuming max height as 100px
+function flipImage(path, ext, cb) {
+    jimp.read(path + ext, (err, image) => {
+        image.flip(true, false)
+            .write(path + "_flipped" + ext, cb);
+    });
+}
+
+function openPoseFrameProcessing(path, cb) {
     jimp.read(path, (err, image) => {
         image.resize(jimp.AUTO, size)
             .quality(100)
