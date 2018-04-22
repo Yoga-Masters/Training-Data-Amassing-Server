@@ -1,6 +1,7 @@
 // cls && browser-sync start --proxy localhost:80 --files "**/*" && ngrok http --bind-tls "both" 80 | npm start
 // clear && browser-sync start --proxy localhost:8080 --port 8081 --files "**/*" | npm start
 // cls && browser-sync start --proxy localhost:80 --files "**/*" | npm start
+// cls && npm start
 // ============================ PACKAGES SETUP =================================
 const fs = require('fs');
 const jimp = require('jimp');
@@ -24,6 +25,7 @@ var maxFPS = 1;
 var users = {};
 var types = {};
 var background;
+var working = false;
 var delAftr = false;
 const app = express();
 const server = http.createServer(app);
@@ -33,6 +35,7 @@ jimp.read("background.jpg", (err, image) => {
 });
 ensureDirectoryExistence("./processing/pictures/frame.png");
 ensureDirectoryExistence("./processing/pictures/processed/frame.png");
+// console.log(extractData(JSON.parse('{"version":1.0, "people":[{ "pose_keypoints":[ 0,0,0,950.986,416.702,0.821036,1091.73,431.277,0.753385,1176.79,598.792,0.714243,1226.72,707.304,0.522699,810.112,407.989,0.760693,730.726,589.916,0.640745,692.542,669.24,0.539292,1030.09,804.064,0.418698,1282.54,721.966,0.609444,1540.79,739.509,0.649982,871.622,810.069,0.456652,642.641,689.547,0.800972,431.517,721.958,0.750155,0,0,0,0,0,0,1018.46,261.233,0.795286,880.386,270.043,0.749068], "face_keypoints":[ ], "hand_left_keypoints":[ ], "hand_right_keypoints":[ ] } ]}')));
 // =============================== APP SETUP ===================================
 app.use(bodyParser.urlencoded({
     extended: false
@@ -71,140 +74,49 @@ tdb.ref("delete").on("value", snap => {
     delAftr = snap.val();
     console.log("delAftr got updated to: " + delAftr);
 });
-tdb.ref("frames").on("value", snap => {
-    var jsonDATA = "const DEFAULT_CLASSES = ['Iris-setosa', 'Iris-versicolor', 'Iris-virginica'];\nconst DEFAULT_NUM_CLASSES = DEFAULT_CLASSES.length;\nconst DEFAULT_DATA = [[5.1, 3.5, 1.4, 0.2, 0], [4.9, 3.0, 1.4, 0.2, 0], [4.7, 3.2, 1.3, 0.2, 0], [4.6, 3.1, 1.5, 0.2, 0], [5.0, 3.6, 1.4, 0.2, 0], [5.4, 3.9, 1.7, 0.4, 0], [4.6, 3.4, 1.4, 0.3, 0], [5.0, 3.4, 1.5, 0.2, 0], [4.4, 2.9, 1.4, 0.2, 0], [4.9, 3.1, 1.5, 0.1, 0], [5.4, 3.7, 1.5, 0.2, 0], [4.8, 3.4, 1.6, 0.2, 0], [4.8, 3.0, 1.4, 0.1, 0], [4.3, 3.0, 1.1, 0.1, 0], [5.8, 4.0, 1.2, 0.2, 0], [5.7, 4.4, 1.5, 0.4, 0], [5.4, 3.9, 1.3, 0.4, 0], [5.1, 3.5, 1.4, 0.3, 0], [5.7, 3.8, 1.7, 0.3, 0], [5.1, 3.8, 1.5, 0.3, 0], [5.4, 3.4, 1.7, 0.2, 0], [5.1, 3.7, 1.5, 0.4, 0], [4.6, 3.6, 1.0, 0.2, 0], [5.1, 3.3, 1.7, 0.5, 0], [4.8, 3.4, 1.9, 0.2, 0], [5.0, 3.0, 1.6, 0.2, 0], [5.0, 3.4, 1.6, 0.4, 0], [5.2, 3.5, 1.5, 0.2, 0], [5.2, 3.4, 1.4, 0.2, 0], [4.7, 3.2, 1.6, 0.2, 0], [4.8, 3.1, 1.6, 0.2, 0], [5.4, 3.4, 1.5, 0.4, 0], [5.2, 4.1, 1.5, 0.1, 0], [5.5, 4.2, 1.4, 0.2, 0], [4.9, 3.1, 1.5, 0.1, 0], [5.0, 3.2, 1.2, 0.2, 0], [5.5, 3.5, 1.3, 0.2, 0], [4.9, 3.1, 1.5, 0.1, 0], [4.4, 3.0, 1.3, 0.2, 0], [5.1, 3.4, 1.5, 0.2, 0], [5.0, 3.5, 1.3, 0.3, 0], [4.5, 2.3, 1.3, 0.3, 0], [4.4, 3.2, 1.3, 0.2, 0], [5.0, 3.5, 1.6, 0.6, 0], [5.1, 3.8, 1.9, 0.4, 0], [4.8, 3.0, 1.4, 0.3, 0], [5.1, 3.8, 1.6, 0.2, 0], [4.6, 3.2, 1.4, 0.2, 0], [5.3, 3.7, 1.5, 0.2, 0], [5.0, 3.3, 1.4, 0.2, 0], [7.0, 3.2, 4.7, 1.4, 1], [6.4, 3.2, 4.5, 1.5, 1], [6.9, 3.1, 4.9, 1.5, 1], [5.5, 2.3, 4.0, 1.3, 1], [6.5, 2.8, 4.6, 1.5, 1], [5.7, 2.8, 4.5, 1.3, 1], [6.3, 3.3, 4.7, 1.6, 1], [4.9, 2.4, 3.3, 1.0, 1], [6.6, 2.9, 4.6, 1.3, 1], [5.2, 2.7, 3.9, 1.4, 1], [5.0, 2.0, 3.5, 1.0, 1], [5.9, 3.0, 4.2, 1.5, 1], [6.0, 2.2, 4.0, 1.0, 1], [6.1, 2.9, 4.7, 1.4, 1], [5.6, 2.9, 3.6, 1.3, 1], [6.7, 3.1, 4.4, 1.4, 1], [5.6, 3.0, 4.5, 1.5, 1], [5.8, 2.7, 4.1, 1.0, 1], [6.2, 2.2, 4.5, 1.5, 1], [5.6, 2.5, 3.9, 1.1, 1], [5.9, 3.2, 4.8, 1.8, 1], [6.1, 2.8, 4.0, 1.3, 1], [6.3, 2.5, 4.9, 1.5, 1], [6.1, 2.8, 4.7, 1.2, 1], [6.4, 2.9, 4.3, 1.3, 1], [6.6, 3.0, 4.4, 1.4, 1], [6.8, 2.8, 4.8, 1.4, 1], [6.7, 3.0, 5.0, 1.7, 1], [6.0, 2.9, 4.5, 1.5, 1], [5.7, 2.6, 3.5, 1.0, 1], [5.5, 2.4, 3.8, 1.1, 1], [5.5, 2.4, 3.7, 1.0, 1], [5.8, 2.7, 3.9, 1.2, 1], [6.0, 2.7, 5.1, 1.6, 1], [5.4, 3.0, 4.5, 1.5, 1], [6.0, 3.4, 4.5, 1.6, 1], [6.7, 3.1, 4.7, 1.5, 1], [6.3, 2.3, 4.4, 1.3, 1], [5.6, 3.0, 4.1, 1.3, 1], [5.5, 2.5, 4.0, 1.3, 1], [5.5, 2.6, 4.4, 1.2, 1], [6.1, 3.0, 4.6, 1.4, 1], [5.8, 2.6, 4.0, 1.2, 1], [5.0, 2.3, 3.3, 1.0, 1], [5.6, 2.7, 4.2, 1.3, 1], [5.7, 3.0, 4.2, 1.2, 1], [5.7, 2.9, 4.2, 1.3, 1], [6.2, 2.9, 4.3, 1.3, 1], [5.1, 2.5, 3.0, 1.1, 1], [5.7, 2.8, 4.1, 1.3, 1], [6.3, 3.3, 6.0, 2.5, 2], [5.8, 2.7, 5.1, 1.9, 2], [7.1, 3.0, 5.9, 2.1, 2], [6.3, 2.9, 5.6, 1.8, 2], [6.5, 3.0, 5.8, 2.2, 2], [7.6, 3.0, 6.6, 2.1, 2], [4.9, 2.5, 4.5, 1.7, 2], [7.3, 2.9, 6.3, 1.8, 2], [6.7, 2.5, 5.8, 1.8, 2], [7.2, 3.6, 6.1, 2.5, 2], [6.5, 3.2, 5.1, 2.0, 2], [6.4, 2.7, 5.3, 1.9, 2], [6.8, 3.0, 5.5, 2.1, 2], [5.7, 2.5, 5.0, 2.0, 2], [5.8, 2.8, 5.1, 2.4, 2], [6.4, 3.2, 5.3, 2.3, 2], [6.5, 3.0, 5.5, 1.8, 2], [7.7, 3.8, 6.7, 2.2, 2], [7.7, 2.6, 6.9, 2.3, 2], [6.0, 2.2, 5.0, 1.5, 2], [6.9, 3.2, 5.7, 2.3, 2], [5.6, 2.8, 4.9, 2.0, 2], [7.7, 2.8, 6.7, 2.0, 2], [6.3, 2.7, 4.9, 1.8, 2], [6.7, 3.3, 5.7, 2.1, 2], [7.2, 3.2, 6.0, 1.8, 2], [6.2, 2.8, 4.8, 1.8, 2], [6.1, 3.0, 4.9, 1.8, 2], [6.4, 2.8, 5.6, 2.1, 2], [7.2, 3.0, 5.8, 1.6, 2], [7.4, 2.8, 6.1, 1.9, 2], [7.9, 3.8, 6.4, 2.0, 2], [6.4, 2.8, 5.6, 2.2, 2], [6.3, 2.8, 5.1, 1.5, 2], [6.1, 2.6, 5.6, 1.4, 2], [7.7, 3.0, 6.1, 2.3, 2], [6.3, 3.4, 5.6, 2.4, 2], [6.4, 3.1, 5.5, 1.8, 2], [6.0, 3.0, 4.8, 1.8, 2], [6.9, 3.1, 5.4, 2.1, 2], [6.7, 3.1, 5.6, 2.4, 2], [6.9, 3.1, 5.1, 2.3, 2], [5.8, 2.7, 5.1, 1.9, 2], [6.8, 3.2, 5.9, 2.3, 2], [6.7, 3.3, 5.7, 2.5, 2], [6.7, 3.0, 5.2, 2.3, 2], [6.3, 2.5, 5.0, 1.9, 2], [6.5, 3.0, 5.2, 2.0, 2], [6.2, 3.4, 5.4, 2.3, 2], [5.9, 3.0, 5.1, 1.8, 2]];\n\n";
-    var time = Date.now();
-    var data = snap.val();
-    var trainingData = {};
-    var poseIndex = {
-        "warriorii": 0,
-        "tree": 1,
-        "triangle": 2
-    };
-    ensureDirectoryExistence("./client/test.data");
-    for (const type in types) trainingData[type] = [];
-    for (const key of Object.keys(data)) {
-        for (const type in types) {
-            if (data[key][type] && !(data[key][type] == 0 || data[key][type] == 1)) {
-                data[key][type].push(poseIndex[data[key].pose]);
-                trainingData[type].push(data[key][type]);
-            }
-        }
-    }
-    for (const type in types) {
-        var dType = types[type].toUpperCase();
-        jsonDATA += "const " + dType + "_CLASSES = " + JSON.stringify(Object.keys(poseIndex)) + ";\nconst " + dType + "_NUM_CLASSES = " + dType + "_CLASSES.length;\nconst " + dType + "_DATA = " + JSON.stringify(trainingData[type]) + ";\n\n";
-    }
-    jsonDATA += "const IRIS_CLASSES = DEFAULT_CLASSES;\nconst IRIS_NUM_CLASSES = DEFAULT_NUM_CLASSES;\nconst IRIS_DATA = DEFAULT_DATA;"
-    fs.writeFile("./client/training_data.js", jsonDATA, 'utf8', err => {
-        console.log("Wrote all data types in json from scratch in " + (Date.now() - time) + "ms");
-        for (const type in types) stringify(trainingData[type], (err, output) => {
-            output = trainingData[type].length + "," + (trainingData[type][0].length - 1) + "," + Object.keys(poseIndex) + "\n" + output;
-            fs.writeFile("./client/training_" + types[type] + ".csv", output, 'utf8', err => {
+tdb.ref("queue").on("value", (snap) => {
+    if (!snap.val()) return;
+    var snapKey = Object.keys(snap.val())[0];
+    var snapshot = snap.val()[snapKey];
+    console.log("New request:", snapshot, "@", snapKey, "...processing...");
+    if (working) {
+        console.log("Other Process working... will trigger on finish later.");
+    } else {
+        working = true;
+        handleTrainingDataPost(snapshot, (done) => {
+            if (!done) {
+                console.log("Invalid request. Deleted & Exited.");
+                tdb.ref("queue/" + snapKey).set(null);
+            } else {
                 tdb.ref("lastUpdated").set(Date.now());
-                console.log("Wrote " + types[type] + " data from scratch in " + (Date.now() - time) + "ms");
-            });
+                tdb.ref("history/" + snapKey).set(snapshot, () => {
+                    working = false;
+                    tdb.ref("queue/" + snapKey).set(null, () => {
+                        console.log("Request complete. Moved to history & exited.");
+                    });
+                });
+            }
         });
-    });
-});
-adb.ref("users").on("child_added", (snap, prevChildKey) => {
-    users[snap.val().key] = snap.val().updating;
-    adb.ref("users/" + snap.val().key + "/updating").on("value", snap => {
-        users[snap.ref.parent.key] = snap.val();
-    });
-    adb.ref("users/" + snap.val().key + "/latestFrame").on("value", snap => {
-        var time = Date.now();
-        var data = snap.val();
-        if (!data || data == "") return;
-        var key = snap.ref.parent.key;
-        var ext = snap.val().split(';')[0].match(/jpeg|png|gif|jpg|webp/)[0];
-        fs.writeFile("./processing/pictures/" + key + "." + ext, data.replace(/^data:image\/\w+;base64,/, ""), 'base64', err => {
-            console.log("Saved new latestFrame from user " + key + " frame in " + (Date.now() - time) + "ms to ./processing/pictures/" + key + "." + ext + "...");
-            runOpenPose("./processing/pictures", "./processing/pictures/processed", () => { //TODO: ALEX, CAN U REPLACE WITH 1 IMAGE ONLY OR FASTER OPENPOSE???
-                handleAppDataUpdating(key, ext, time);
-            });
-        });
-    });
+    }
 });
 // =============================== ROUTING SETUP ===============================
-app.get('/api', (req, res) => res.send({
-    "return": 'Hello World @ Yoga Master - App & Training - Server DB API!'
-}));
-app.post('/postapi', (req, res) => {
-    handleTrainingDataPost(req.body);
-    fs.appendFile('./client/history.txt', JSON.stringify(req.body) + "\n", err => {
-        console.log("Got a POST: " + JSON.stringify(req.body) + "\nSaved to history.txt!");
-        res.redirect('/');
-    });
-});
-app.get('/api/getpost', (req, res) => {
-    console.log("Got a GET POST: " + req.query);
-    handleTrainingDataPost(req.query);
-    res.send({
-        "processing": req.query
-    });
-});
-app.get('/api/deleteKey/:key', (req, res) => {
-    tdb.ref("frames/" + req.params.key).set(null, () => {
-        res.send({
-            "return": "Deleted key " + req.params.key + " data!"
-        });
-    });
-});
-app.get('/api/delete', (req, res) => {
-    rimraf('./processing', () => {
-        console.log("Cleared the processing folder...");
-        res.send({
-            "return": "Deleted all cached training data!"
-        });
-    });
-});
+// TODO: MOVE FUNCTIONALITY TO SEPERATE METHOD THAT DOES THE SAME THING AS QUE HANDLING
 app.get('/api/redownload', (req, res) => {
-    var count = 0;
-    lineReader.eachLine('history.txt', (line, last) => {
-        console.log("Started redownload of the processing folder using history.txt...");
-        request.post("localhost:" + server.address().port + "/postapi").form(JSON.parse(line)); //FIX FOR ALEX'S HOME SERVER
-        count++;
-        if (last) res.send({
-            "return": "ReDownloaded " + count + " requests!"
+    tdb.ref("history").once("value", (snap) => {
+        tdb.ref("queue").update(snap.val(), () => {
+            res.send({"return": "done!"});
         });
     });
 });
-// ==================== APP HANDLING PROCESSING FUNCTIONS ====================
-function handleAppDataUpdating(user, ext, time) {
-    fs.readFile("./processing/pictures/processed/" + user + "_keypoints.json", 'utf8', (err, data) => {
-        console.log("Finished reading file " + user + " json after " + (Date.now() - time) + "ms. Processing image...");
-        if (!data) return;
-        var openPoseData = extractData(JSON.parse(data));
-        if (openPoseData[1] == 0 || openPoseData[1] == 1)
-            updateAppData(user, openPoseData, {}, time);
-        else imageProcessing("./processing/pictures/" + user + "." + ext, openPoseData[0][0], openPoseData[0][1], openPoseData[0][2], openPoseData[0][3], (err, trainingImage) => {
-            console.log("Openpose successfully found a whole person!");
-            updateAppData(user, openPoseData, {
-                "latestTensorData/latestProcessedFrame": trainingImage
-            }, time);
-        });
-    });
-}
-
-function updateAppData(user, openPoseData, newData, time) {
-    openPoseFrameProcessing(("./processing/pictures/processed/" + user + "_rendered.png"), (err, openposeImage) => {
-        console.log("Finished processing file " + user + " images after " + (Date.now() - time) + "ms. Uploading data...");
-        newData["lastUpdated"] = Date.now();
-        newData["latestOpenPoseFrame"] = openposeImage;
-        for (var type in openPoseData)
-            if (type > 0) newData["latestTensorData/datatype" + type] = openPoseData[type];
-        adb.ref("users/" + user).update(newData);
-    });
-}
 // ======================== YOUTUBE DOWNLOADER FUNCTIONS =======================
-function handleTrainingDataPost(body) { // Download a video, convert it to frames, then upload the processed frames to firebase to train.
+function handleTrainingDataPost(body, cb) { // Download a video, convert it to frames, then upload the processed frames to firebase to train.
     var framesFolder = getRandomKey();
     var videoID = ytdl.getVideoID(body.url);
     var validVideo = ytdl.validateURL("youtube.com/watch?v=" + videoID);
-    if (!validVideo)
+    if (!validVideo) {
         console.log("No video found OR not a valid video with ID \"" + videoID + "\" from \"" + body.url + "\"");
-    else downloadYoutubeVideo(videoID, framesFolder, fps => {
+        cb(false);
+    } else downloadYoutubeVideo(videoID, framesFolder, fps => {
         var framesDict = {};
         var length = (Object.keys(body).length - 1) / 5;
         console.log("body: " + JSON.stringify(body));
@@ -217,11 +129,11 @@ function handleTrainingDataPost(body) { // Download a video, convert it to frame
                 (parseInt(body["endTimeStampMin" + i]) * 60 + parseInt(body["endTimeStampSec" + i])) * fps
             ]);
         }
-        convertToFrames(framesDict, videoID, framesFolder, fps);
+        convertToFrames(framesDict, videoID, framesFolder, fps, cb);
     });
 }
 
-function convertToFrames(framesDict, id, folder, fps) { // ffmpeg -i video.mp4 -vf select='eq(n\,30)+eq(n\,31)' -vsync 0 frames+"selectedPose"+%d.jpg
+function convertToFrames(framesDict, id, folder, fps, cb) { // ffmpeg -i video.mp4 -vf select='eq(n\,30)+eq(n\,31)' -vsync 0 frames+"selectedPose"+%d.jpg
     ensureDirectoryExistence("./processing/videos/" + id + "/" + folder + "/1.jpg");
     var completion = {};
     var time = Date.now();
@@ -246,12 +158,12 @@ function convertToFrames(framesDict, id, folder, fps) { // ffmpeg -i video.mp4 -
         ], (error, stdout, stderr) => {
             completion[pose] = true;
             console.log("Finished " + pose + " pose for " + id + " @ " + folder + " in " + (Date.now() - time) + "ms!");
-            checkFramesCompleteAndFlip(completion, id, folder, time);
+            checkFramesCompleteAndFlip(completion, id, folder, time, cb);
         });
     }
 }
 
-function checkFramesCompleteAndFlip(check, video, folder, time) {
+function checkFramesCompleteAndFlip(check, video, folder, time, cb) {
     for (const pose of Object.keys(check))
         if (!check[pose]) return;
     var completion = {};
@@ -269,17 +181,25 @@ function checkFramesCompleteAndFlip(check, video, folder, time) {
             flipImage("./processing/videos/" + video + "/" + folder + "/" + file, ".jpg", () => {
                 console.log("Finished flipping " + file + ".jpg after " + (Date.now() - time) + "ms!");
                 completion[file] = true;
-                processFrames(video, folder, completion);
+                processFrames(video, folder, completion, cb);
             });
         });
     });
 }
 
-function processFrames(video, folder, check) {
+function processFrames(video, folder, check, cb) {
     for (const flip of Object.keys(check))
         if (!check[flip]) return;
     var time = Date.now();
+    var completion = {};
     runOpenPose("./processing/videos/" + video + "/" + folder, "", () => {
+        fs.readdir("./processing/videos/" + video + "/" + folder, (err, files) => {
+            files.forEach(file => {
+                if (path.extname(file) != ".jpg") return;
+                file = file.slice(0, -(".jpg".length));
+                completion[file] = false;
+            });
+        });
         fs.readdir("./processing/videos/" + video + "/" + folder, (err, files) => {
             files.forEach(file => {
                 if (path.extname(file) != ".jpg") return;
@@ -287,16 +207,22 @@ function processFrames(video, folder, check) {
                 console.log("Processing file " + file + " after " + (Date.now() - time) + "ms...");
                 fs.readFile("./processing/videos/" + video + "/" + folder + "/" + file + "_keypoints.json", 'utf8', (err, data) => {
                     console.log("Finished reading file " + file + " json after " + (Date.now() - time) + "ms. Processing images...");
-                    uploadFrameData(video, folder, file, extractData(JSON.parse(data)), time);
+                    uploadFrameData(video, folder, file, extractData(JSON.parse(data)), time, (valid) => {
+                        if (!valid) delete completion[file];
+                        else completion[file] = true;
+                        checkReqComplete(completion, video, folder, cb);
+                    });
                 });
             });
         });
     });
 }
 
-function uploadFrameData(video, folder, file, openPoseData, time) {
-    if (openPoseData[1] == 0 || openPoseData[1] == 1) return;
-    else imageProcessing("./processing/videos/" + video + "/" + folder + "/" + file + ".jpg", openPoseData[0][0], openPoseData[0][1], openPoseData[0][2], openPoseData[0][3], (err, trainingImage) => {
+function uploadFrameData(video, folder, file, openPoseData, time, cb) {
+    if (openPoseData[1] == 0 || openPoseData[1] == 1) {
+        console.log("File " + file + " is invalid. Skipping...");
+        cb(false);
+    } else imageProcessing("./processing/videos/" + video + "/" + folder + "/" + file + ".jpg", openPoseData[0][0], openPoseData[0][1], openPoseData[0][2], openPoseData[0][3], (err, trainingImage) => {
         openPoseFrameProcessing(("./processing/videos/" + video + "/" + folder + "/" + file + "_rendered.png"), (err, openposeImage) => {
             console.log("Finished processing file " + file + " images after " + (Date.now() - time) + "ms. Uploading data...");
             var newData = {
@@ -309,12 +235,22 @@ function uploadFrameData(video, folder, file, openPoseData, time) {
             for (var type in openPoseData)
                 if (type > 0) newData["datatype" + type] = openPoseData[type];
             tdb.ref("frames/" + video + "-" + folder + "-" + file).set(newData, err => {
-                console.log("Finished uploading file " + file + " data after " + (Date.now() - time) + "ms..." + (delAftr ? " Deleting it now..." : ""));
-                if (delAftr) delFrame(video, folder, file);
-                removeDirectories('./processing');
+                console.log("Finished uploading file " + file + " data after " + (Date.now() - time) + "ms.");
+                cb(true);
             });
         });
     });
+}
+
+function checkReqComplete(completion, video, folder, cb) {
+    for (const done of Object.keys(completion))
+        if (!completion[done]) return;
+    console.log("Finished request " + video + "/" + folder + ". " + (delAftr ? "Deleting the directory now..." : ""));
+    if (delAftr) rimraf("./processing/videos/" + video + "/" + folder, () => {
+        console.log("Deleted the processing folder...");
+        cb(true);
+    });
+    else cb(true);
 }
 
 function downloadYoutubeVideo(url, folder, callback) { // Check if a video is downloaded and then download it, or skip ahead
@@ -358,7 +294,7 @@ function getFPS(path, callback) { // ffprobe -v 0 -of csv=p=0 -select_streams 0 
         callback(Math.round(parseInt(stdout.substring(0, stdout.indexOf("/"))) / parseInt(stdout.substring(stdout.indexOf("/") + 1))));
     });
 }
-// ==================== OPENPOSE + IMG PROCESSING FUNCTIONS ====================
+// ==================== OPENPOSE + DATA PROCESSING FUNCTIONS ===================
 function runOpenPose(dir, outDir, callback) { // OpenPoseDemo.exe --image_dir [DIRECTORY] --write_images [DIRECTORY] --write_keypoint_json [DIRECTORY] --no_display
     var time = Date.now();
     if (outDir == "") outDir = dir;
@@ -382,7 +318,7 @@ function extractData(poseData) {
         0 // 0, 1, OR ARRAY OF ANGLES AND MAGNITUDES CONCATENATED
         //0, // ANY OTHER WAYS WE CAN THINK OF GATHERING MEANING FROM OPEN POSE, MAYBE ANGLES BASED ON THE NEW WEBSITE WE FOUND?
     ];
-    if (poseData.people.length == 0) return output; // Nobody in frame
+    if (poseData.people.length == 0) return output; // Return 0s for nobody in frame
     output[1] = output[2] = output[3] = output[4] = 1;
     var personIndex = -1;
     for (var p = poseData.people.length - 1; p > -1; p--) {
@@ -390,165 +326,197 @@ function extractData(poseData) {
         for (var i = 3; i < 42; i++) // Change personIndex back to -1 if person data is incomplete 
             if (poseData.people[p].pose_keypoints[i] == 0) personIndex = -1;
     }
-    if (personIndex == -1) return output;
-    var keypoints = poseData.people[personIndex].pose_keypoints; // TODO: THINK ABOUT HOW TO DEAL WITH MULTIPLE PEOPLE IN FRAME
+    if (personIndex == -1) return output; // Return 1s for incomplete person in frame
+    var keypoints = poseData.people[personIndex].pose_keypoints;
     output[0] = getCropData(keypoints); //Get crop data
-    output[1] = extractMagnitudes(keypoints); //Relative magnitudes
-    output[2] = extractRelativeCoordinates(keypoints); //Relative coordinates
+    output[1] = extractMagnitudes(keypoints, output[0][2] - output[0][0]); //Relative magnitudes
+    output[2] = extractRelativeCoordinates(keypoints, output[0]); //Relative coordinates
     output[3] = extractAngleRelativeToLine(keypoints); //Angle relative to vertical line
     output[4] = output[3].concat(output[1]); //Concat of relative angles to vertical line and relative magnitudes
     return output;
 }
-
 /*
-Finds cropping dimensions for pose image.
-Inputs keypoints array from a JSON output from openpose
-Returns array of [Upper left X coord, 
-                  Upper left Y coord, 
-                  Lower right X coord.
-                  Lower right Y coord]
-If no pose is found, return -1
-
-Note:
-    Does not guarantee that the coords are within original image dimensions.
-    Pads so the crop dimensions are square.
-    THIS DOES NOT GUARANTEE THAT THE COORDINATES ARE VALID (i.e. negative coords are possible)
+    Finds cropping dimensions for pose image.
+    Inputs keypoints array from a JSON output from openpose
+    Return [Upper left X coord, 
+            Upper left Y coord, 
+            Lower right X coord.
+            Lower right Y coord]
+    If no pose is found, return [280, 0, 1000, 720], a default center square for 720p webcams
+    Note:
+        Does not guarantee that the coords are within original image dimensions.
+        Pads so the crop dimensions are square.
+        THIS DOES NOT GUARANTEE THAT THE COORDINATES ARE VALID (i.e. negative coords are possible)
 */
 function getCropData(keypoints) {
-    //No pose is found
-    if (keypoints.length == 0)
-        return [280, 0, 1000, 720];
-    //Checks for pose completion
-    // for (var i=3; i<42; i++) {
-    //     if (keypoints[i] == 0)
-    //         return 1;
-    // }
-
-    var upper = Infinity;
-    var lower = 0;
-    var left = Infinity;
-    var right = 0;
-
-    for (var i = 0; i < keypoints.length; i++) {
-        value = keypoints[i];
-        if ((i + 3) % 3 === 0) {
-            if (value < left & value != 0)
-                left = value;
-            if (value > right & value != 0)
-                right = value;
-        }
-        if ((i + 3) % 3 === 1) {
-            if (value < upper & value != 0)
-                upper = value;
-            if (value > lower & value != 0)
-                lower = value;
-        }
+    var xMax = -Infinity;
+    var xMin = Infinity;
+    var yMax = -Infinity;
+    var yMin = Infinity;
+    for (i = 0; i < keypoints.length; i += 3) {
+        if (keypoints[i] != 0 && xMin > keypoints[i]) xMin = keypoints[i];
+        if (keypoints[i] != 0 && xMax < keypoints[i]) xMax = keypoints[i];
     }
-    upper = Math.round(upper);
-    lower = Math.round(lower);
-    left = Math.round(left);
-    right = Math.round(right);
-
-    height = lower - upper;
-    width = right - left;
-
-    //padding
-    if (height > width) {
-        var padding = Math.round((height - width) / 2);
-        left -= padding;
-        right += padding;
-    } else {
-        var padding = Math.round((width - height) / 2);
-        upper -= padding;
-        lower += padding;
+    for (i = 1; i < keypoints.length; i += 3) {
+        if (keypoints[i] != 0 && yMax < keypoints[i]) yMax = keypoints[i];
+        if (keypoints[i] != 0 && yMin > keypoints[i]) yMin = keypoints[i];
     }
-
-    return [upper, left, lower, right];
+    xMax += 50;
+    xMin -= 50;
+    yMax += 50;
+    yMin -= 50;
+    var width = xMax - xMin;
+    var height = yMax - yMin;
+    if (width < height) {
+        xMin -= (height - width) / 2;
+        xMax += (height - width) / 2;
+    } else if (width > height) {
+        yMin -= (width - height) / 2;
+        yMax += (width - height) / 2;
+    }
+    return [xMin, yMin, xMax, yMax].map(x => Math.round(x));
 }
-
-
 /*
-Input: Keypoint array from Openpose JSON
-       Assumes it's complete and exists
-Output: 0 = no pose
-        1 = incomplete pose
-        Array of scaled magnitudes trimmed to 5 decimal places
-            Scale is magnitude / pose width
+    Input: Keypoint array from Openpose JSON; Assumes it's complete and exists
+    Output: Array of scaled magnitudes trimmed to 5 decimal places; Scale is magnitude / pose width
 */
-function extractMagnitudes(keypoints) {
-    //find midpoint (average of all points)
+function extractMagnitudes(keypoints, size) {
     var avgX = 0;
     var avgY = 0;
-
     for (var i = 1; i <= 13; i++) {
         avgX += keypoints[i * 3];
-        avgY += keypoints[i * 3 + 1]
+        avgY += keypoints[i * 3 + 1];
     }
     avgX = avgX / 13;
     avgY = avgY / 13;
-
-    //[upper,left,lower,right]
-    var size = getCropData(keypoints);
-    // width and height should be equal
-    var width = size[3] - size[1];
-
-    console.log("width, height in pixels " + width + ", " + height)
-
-    //Trims to 3 decimal places
-    var l_shoulder = parseFloat((magnitude(keypoints[15], keypoints[16], avgX, avgY) / width).toFixed(3));
-    var r_shoulder = parseFloat((magnitude(keypoints[6], keypoints[7], avgX, avgY) / width).toFixed(3));
-    var l_arm = parseFloat((magnitude(keypoints[18], keypoints[19], avgX, avgY) / width).toFixed(3));
-    var r_arm = parseFloat((magnitude(keypoints[9], keypoints[10], avgX, avgY) / width).toFixed(3));
-    var l_farm = parseFloat((magnitude(keypoints[21], keypoints[22], avgX, avgY) / width).toFixed(3));
-    var r_farm = parseFloat((magnitude(keypoints[12], keypoints[13], avgX, avgY) / width).toFixed(3));
-    var l_spine = parseFloat((magnitude(keypoints[33], keypoints[34], avgX, avgY) / width).toFixed(3));
-    var r_spine = parseFloat((magnitude(keypoints[24], keypoints[25], avgX, avgY) / width).toFixed(3));
-    var l_thigh = parseFloat((magnitude(keypoints[36], keypoints[37], avgX, avgY) / width).toFixed(3));
-    var r_thigh = parseFloat((magnitude(keypoints[27], keypoints[28], avgX, avgY) / width).toFixed(3));
-    var l_leg = parseFloat((magnitude(keypoints[39], keypoints[40], avgX, avgY) / width).toFixed(3));
-    var r_leg = parseFloat((magnitude(keypoints[30], keypoints[31], avgX, avgY) / width).toFixed(3));
-
-    poseData = [l_shoulder, r_shoulder,
-        l_arm, r_arm,
-        l_farm, r_farm,
-        l_spine, r_spine,
-        l_thigh, r_thigh,
-        l_leg, r_leg
+    // console.log("AvgX: " + avgX + " | AvgY: " + avgY + " || Width: " + size + " | Height: " + size);
+    return [
+        parseFloat((magnitude(keypoints[15], keypoints[16], avgX, avgY) / size).toFixed(4)),
+        parseFloat((magnitude(keypoints[6], keypoints[7], avgX, avgY) / size).toFixed(4)),
+        parseFloat((magnitude(keypoints[18], keypoints[19], avgX, avgY) / size).toFixed(4)),
+        parseFloat((magnitude(keypoints[9], keypoints[10], avgX, avgY) / size).toFixed(4)),
+        parseFloat((magnitude(keypoints[21], keypoints[22], avgX, avgY) / size).toFixed(4)),
+        parseFloat((magnitude(keypoints[12], keypoints[13], avgX, avgY) / size).toFixed(4)),
+        parseFloat((magnitude(keypoints[33], keypoints[34], avgX, avgY) / size).toFixed(4)),
+        parseFloat((magnitude(keypoints[24], keypoints[25], avgX, avgY) / size).toFixed(4)),
+        parseFloat((magnitude(keypoints[36], keypoints[37], avgX, avgY) / size).toFixed(4)),
+        parseFloat((magnitude(keypoints[27], keypoints[28], avgX, avgY) / size).toFixed(4)),
+        parseFloat((magnitude(keypoints[39], keypoints[40], avgX, avgY) / size).toFixed(4)),
+        parseFloat((magnitude(keypoints[30], keypoints[31], avgX, avgY) / size).toFixed(4))
     ];
-
-    return poseData;
+}
+/*
+    Return relative coords of keypoints
+    [X1, Y1, X2, Y2, ...]
+*/
+function extractRelativeCoordinates(keypoints, size) {
+    var dimension = size[2] - size[0];
+    var output = [];
+    for (var i = 0; i <= 39; i += 3) {
+        output.push(parseFloat(((keypoints[i] - size[1]) / dimension).toFixed(4)));
+        output.push(parseFloat(((keypoints[i + 1] - size[0]) / dimension).toFixed(4)));
+    }
+    return output;
+}
+/*
+    Return relative coords of keypoints
+    [Angle1, Angle2, Angle3, ...]
+*/
+function extractAngleRelativeToLine(keypoints) {
+    return [
+        AngleRelativeToLine(keypoints[3], keypoints[4], keypoints[15], keypoints[16]),
+        AngleRelativeToLine(keypoints[3], keypoints[4], keypoints[6], keypoints[7]),
+        AngleRelativeToLine(keypoints[15], keypoints[16], keypoints[18], keypoints[19]),
+        AngleRelativeToLine(keypoints[6], keypoints[7], keypoints[9], keypoints[10]),
+        AngleRelativeToLine(keypoints[18], keypoints[19], keypoints[21], keypoints[22]),
+        AngleRelativeToLine(keypoints[9], keypoints[10], keypoints[12], keypoints[13]),
+        AngleRelativeToLine(keypoints[3], keypoints[4], keypoints[33], keypoints[34]),
+        AngleRelativeToLine(keypoints[3], keypoints[4], keypoints[24], keypoints[25]),
+        AngleRelativeToLine(keypoints[33], keypoints[34], keypoints[36], keypoints[37]),
+        AngleRelativeToLine(keypoints[24], keypoints[25], keypoints[27], keypoints[28]),
+        AngleRelativeToLine(keypoints[36], keypoints[37], keypoints[39], keypoints[40]),
+        AngleRelativeToLine(keypoints[27], keypoints[28], keypoints[30], keypoints[31]),
+    ];
+}
+// ======================== IMAGE PROCESSING FUNCTIONS ========================
+function imageProcessing(path, x1, y1, x2, y2, cb) {
+    console.log(x1, y1, x2, y2);
+    jimp.read(path, (err, image) => {
+        if (err) {
+            cb(false)
+            console.log(err);
+        } else background.resize((x2 - x1), (y2 - y1)) // Resizes the 1x1 Gray to the size we need it
+            .composite(image, -x1, -y1) //Composite the image to have no Grey
+            .resize(size, size) //resize to 100 x 100
+            .quality(100) // set JPEG quality
+            .greyscale() // greyscale
+            .getBase64(jimp.MIME_JPEG, cb); // return image as base64 in passed in callback
+    });
 }
 
+function flipImage(path, ext, cb) {
+    jimp.read(path + ext, (err, image) => {
+        if (err) {
+            cb(false)
+            console.log(err);
+        } else image.flip(true, false)
+            .write(path + "_flipped" + ext, cb);
+    });
+}
 
-//Returns absolute distance between two (X,Y) coordinates
-function magnitude(x1, y1, x2, y2) {
+function openPoseFrameProcessing(path, cb) {
+    jimp.read(path, (err, image) => {
+        if (err) {
+            cb(false)
+            console.log(err);
+        } else image.resize(jimp.AUTO, size)
+            .quality(100)
+            .getBase64(jimp.MIME_JPEG, cb);
+    });
+}
+// ============================= HELPER FUNCTIONS ==============================
+function ensureDirectoryExistence(filePath) {
+    var dirname = path.dirname(filePath);
+    if (fs.existsSync(dirname)) return true;
+    ensureDirectoryExistence(dirname);
+    fs.mkdirSync(dirname);
+}
+
+function delFrame(video, folder, file) {
+    delFile("./processing/videos/" + video + "/" + folder + "/" + file + ".jpg", () => {});
+    delFile("./processing/videos/" + video + "/" + folder + "/" + file + "_flipped.jpg", () => {});
+    delFile("./processing/videos/" + video + "/" + folder + "/" + file + "_rendered.png", () => {});
+    delFile("./processing/videos/" + video + "/" + folder + "/" + file + "_flipped_rendered.png", () => {});
+    delFile("./processing/videos/" + video + "/" + folder + "/" + file + "_keypoints.json", () => {});
+    delFile("./processing/videos/" + video + "/" + folder + "/" + file + "_flipped_keypoints.json", () => {});
+}
+
+function delFile(path, cb) {
+    fs.unlink(path, cb);
+}
+
+function getRandomKey(len) {
+    return crypto.randomBytes(Math.floor(len / 2) || 8).toString('hex');
+}
+
+function readPose(name) {
+    if (name.toLowerCase().includes("warriorii")) return "warriorii";
+    else if (name.toLowerCase().includes("tree")) return "tree";
+    else if (name.toLowerCase().includes("triangle")) return "triangle";
+    else return false;
+}
+
+function magnitude(x1, y1, x2, y2) { //Returns absolute distance between two (X,Y) coordinates
     return Math.abs(Math.pow((Math.pow((x2 - x1), 2) + Math.pow((y2 - y1), 2)), 0.5));
 }
 
-
-function extractAngleRelativeToLine(keypoints) {
-    var l_shoulder = AngleRelativeToLine(keypoints[3], keypoints[4], keypoints[15], keypoints[16]);
-    var r_shoulder = AngleRelativeToLine(keypoints[3], keypoints[4], keypoints[6], keypoints[7]);
-    var l_arm = AngleRelativeToLine(keypoints[15], keypoints[16], keypoints[18], keypoints[19]);
-    var r_arm = AngleRelativeToLine(keypoints[6], keypoints[7], keypoints[9], keypoints[10]);
-    var l_farm = AngleRelativeToLine(keypoints[18], keypoints[19], keypoints[21], keypoints[22]);
-    var r_farm = AngleRelativeToLine(keypoints[9], keypoints[10], keypoints[12], keypoints[13]);
-    var l_spine = AngleRelativeToLine(keypoints[3], keypoints[4], keypoints[33], keypoints[34]);
-    var r_spine = AngleRelativeToLine(keypoints[3], keypoints[4], keypoints[24], keypoints[25]);
-    var l_thigh = AngleRelativeToLine(keypoints[33], keypoints[34], keypoints[36], keypoints[37]);
-    var r_thigh = AngleRelativeToLine(keypoints[24], keypoints[25], keypoints[27], keypoints[28]);
-    var l_leg = AngleRelativeToLine(keypoints[36], keypoints[37], keypoints[39], keypoints[40]);
-    var r_leg = AngleRelativeToLine(keypoints[27], keypoints[28], keypoints[30], keypoints[31]);
-
-    return [l_shoulder, r_shoulder,
-        l_arm, r_arm,
-        l_farm, r_farm,
-        l_spine, r_spine,
-        l_thigh, r_thigh,
-        l_leg, r_leg
-    ];
+function radiansToDegrees(radians) {
+    return (radians * 180 / Math.PI);
 }
 
+function degreesToRadians(degrees) {
+    return (degrees * Math.PI / 180);
+}
 
 /*
 Returns an angle between two points relative to a straight line going up.
@@ -590,138 +558,8 @@ Degree  Shape (points 1 and 2)
 -------------
 */
 function AngleRelativeToLine(x1, y1, x2, y2) {
-    // Convert points to vectors
-    var vectorX = x2 - x1;
-    var vectorY = y2 - y1;
-    var magnitude = Math.pow((Math.pow(vectorX, 2) + Math.pow(vectorY, 2)), 0.5);
-
-    var angle = Math.round(radiansToDegrees(Math.acos(vectorY / magnitude)));
-
-    //return (x2 > x1) ? angle : (angle >= 180 ? 360 - angle : angle);
-
-    //positive angle if skewed right, negative if left. See comments above ^
+    var angle = Math.round(radiansToDegrees(Math.acos((y2 - y1) / Math.pow((Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)), 0.5))));
     return (x2 > x1) ? angle : -angle;
-}
-
-
-//Return relative coords of keypoints
-//[X1, Y1, X2, Y2, ...]
-function extractRelativeCoordinates(keypoints) {
-    //[upper,left,lower,right]
-    var size = getCropData(keypoints);
-    // width and height should be equal
-    var width = size[3] - size[1];
-    var output = [];
-    var coordX, coordY;
-
-    for (var i = 0; i <= 39; i += 3) {
-        //X
-        coordX = keypoints[i] - size[1];
-        output.push(parseFloat((coordX / width).toFixed(3)));
-        //Y
-        coordY = keypoints[i + 1] - size[0]
-        output.push(parseFloat((coordY / width).toFixed(3)));
-    }
-    return output;
-}
-
-
-function extractAngles(poseData) {
-    var hasPerson = poseData.hasOwnProperty('people') && poseData.people.length > 0;
-    //TODO Change to for loop method
-    var fullPerson = hasPerson && poseData.people[0].pose_keypoints.length > 54;
-    var keypoints = fullPerson ? poseData.people[0].pose_keypoints : null; // TODO: Read JSON file, Extract pose data from an array of 54 numbers
-    var angles = fullPerson ? [getAngleAbsolute(keypoints[3], keypoints[4], keypoints[0], keypoints[1]),
-        getAngleAbsolute(keypoints[3], keypoints[4], keypoints[15], keypoints[16]),
-        getAngleAbsolute(keypoints[3], keypoints[4], keypoints[6], keypoints[7]),
-        getAngleAbsolute(keypoints[15], keypoints[16], keypoints[18], keypoints[19]),
-        getAngleAbsolute(keypoints[6], keypoints[7], keypoints[9], keypoints[10]),
-        getAngleAbsolute(keypoints[18], keypoints[19], keypoints[21], keypoints[22]),
-        getAngleAbsolute(keypoints[9], keypoints[10], keypoints[12], keypoints[13]),
-        getAngleAbsolute(keypoints[3], keypoints[4], keypoints[33], keypoints[34]),
-        getAngleAbsolute(keypoints[3], keypoints[4], keypoints[24], keypoints[25]),
-        getAngleAbsolute(keypoints[33], keypoints[34], keypoints[36], keypoints[37]),
-        getAngleAbsolute(keypoints[24], keypoints[25], keypoints[27], keypoints[28]),
-        getAngleAbsolute(keypoints[36], keypoints[37], keypoints[39], keypoints[40]),
-        getAngleAbsolute(keypoints[27], keypoints[28], keypoints[30], keypoints[31]),
-        //TODO: PUT IN RELATIVE ANGLES
-    ] : (!hasPerson ? 0 : 1);
-    return [angles, [450, 50, 1450, 1050]]; // TODO: FIX THIS TO CORRECT NUMBERS
-}
-
-function imageProcessing(path, x1, y1, x2, y2, cb) {
-    console.log(x1, y1, x2, y2);
-    jimp.read(path, (err, image) => {
-        background.resize((x2 - x1), (y2 - y1)) // Resizes the 1x1 Gray to the size we need it
-            .composite(image, -x1, -y1) //Composite the image to have no Grey
-            .resize(size, size) //resize to 100 x 100
-            .quality(100) // set JPEG quality
-            .greyscale() // greyscale
-            .getBase64(jimp.MIME_JPEG, cb); // return image as base64 in passed in callback
-    });
-}
-
-function flipImage(path, ext, cb) {
-    jimp.read(path + ext, (err, image) => {
-        image.flip(true, false)
-            .write(path + "_flipped" + ext, cb);
-    });
-}
-
-function openPoseFrameProcessing(path, cb) {
-    jimp.read(path, (err, image) => {
-        image.resize(jimp.AUTO, size)
-            .quality(100)
-            .getBase64(jimp.MIME_JPEG, cb);
-    });
-}
-// TODO: FINISH THIS METHOD
-function getAngleAbsolute(x1, y1, x2, y2) { // Convert lines to vectors
-    var vectorX = x2 - y1;
-    var vectorY = y2 - y1;
-    var magnitude = Math.pow((Math.pow(vectorX, 2) + Math.pow(vectorY, 2)), 0.5);
-    var angle = radiansToDegrees(Math.acos(vectorY / magnitude));
-    if (x2 >= x1)
-        return angle;
-    return 360 - angle;
-}
-// TODO: FINISH THIS METHOD
-function getAngleRelative() { /* Convert 2 lines to 2 vectors to get the angle between vectors */ }
-// ============================= HELPER FUNCTIONS ==============================
-function ensureDirectoryExistence(filePath) {
-    var dirname = path.dirname(filePath);
-    if (fs.existsSync(dirname)) return true;
-    ensureDirectoryExistence(dirname);
-    fs.mkdirSync(dirname);
-}
-
-function delFrame(video, folder, file) {
-    delFile("./processing/videos/" + video + "/" + folder + "/" + file + ".jpg", () => {});
-    delFile("./processing/videos/" + video + "/" + folder + "/" + file + "_rendered.png", () => {});
-    delFile("./processing/videos/" + video + "/" + folder + "/" + file + "_keypoints.json", () => {});
-}
-
-function delFile(path, cb) {
-    fs.unlink(path, cb);
-}
-
-function getRandomKey(len) {
-    return crypto.randomBytes(Math.floor(len / 2) || 8).toString('hex');
-}
-
-function readPose(name) {
-    if (name.toLowerCase().includes("warriorii")) return "warriorii";
-    else if (name.toLowerCase().includes("tree")) return "tree";
-    else if (name.toLowerCase().includes("triangle")) return "triangle";
-    else return false;
-}
-
-function radiansToDegrees(radians) {
-    return (radians * 180 / Math.PI);
-}
-
-function degreesToRadians(degrees) {
-    return (degrees * Math.PI / 180);
 }
 // ================ OLD CODE USED FOR TESTING AND UNDERSTANDING ================
 // var bgSize = 1280;
@@ -814,9 +652,9 @@ function degreesToRadians(degrees) {
 //         else fs.readFile("./processing/pictures/processed/" + user + "_keypoints.json", 'utf8', (err, data) => {
 //             console.log("Finished reading file " + user + " json after " + (Date.now() - time) + "ms. Processing image...");
 //             var openPoseData = extractAngles(JSON.parse(data));
-//             if (openPoseData[0] == 0 || openPoseData[0] == 1) return; //TODO: TURN THIS ON FOR FINAL VERSION
+//             if (openPoseData[0] == 0 || openPoseData[0] == 1) return;
 //             else imageProcessing("./processing/pictures/" + user + "." + ext, openPoseData[1][0], openPoseData[1][1], openPoseData[1][2], openPoseData[1][3], (err, trainingImage) => {
-//                 openPoseFrameProcessing(("./processing/pictures/processed" + user + ".jpg"), (err, openposeImage) => { //TODO: FIX THIS PATH
+//                 openPoseFrameProcessing(("./processing/pictures/processed" + user + ".jpg"), (err, openposeImage) => {
 //                     console.log("Finished processing file " + user + " images after " + (Date.now() - time) + "ms. Uploading data...");
 //                     adb.ref("users/" + user).update({
 //                         "lastUpdated": Date.now(),
@@ -855,3 +693,124 @@ function degreesToRadians(degrees) {
 //         });
 //     });
 // }
+// ---- OLD CODE TO CREATE JS AND CSV DATA DOWNLOAD FILES -----
+// var jsonDATA = "const DEFAULT_CLASSES = ['Iris-setosa', 'Iris-versicolor', 'Iris-virginica'];\nconst DEFAULT_NUM_CLASSES = DEFAULT_CLASSES.length;\nconst DEFAULT_DATA = [[5.1, 3.5, 1.4, 0.2, 0], [4.9, 3.0, 1.4, 0.2, 0], [4.7, 3.2, 1.3, 0.2, 0], [4.6, 3.1, 1.5, 0.2, 0], [5.0, 3.6, 1.4, 0.2, 0], [5.4, 3.9, 1.7, 0.4, 0], [4.6, 3.4, 1.4, 0.3, 0], [5.0, 3.4, 1.5, 0.2, 0], [4.4, 2.9, 1.4, 0.2, 0], [4.9, 3.1, 1.5, 0.1, 0], [5.4, 3.7, 1.5, 0.2, 0], [4.8, 3.4, 1.6, 0.2, 0], [4.8, 3.0, 1.4, 0.1, 0], [4.3, 3.0, 1.1, 0.1, 0], [5.8, 4.0, 1.2, 0.2, 0], [5.7, 4.4, 1.5, 0.4, 0], [5.4, 3.9, 1.3, 0.4, 0], [5.1, 3.5, 1.4, 0.3, 0], [5.7, 3.8, 1.7, 0.3, 0], [5.1, 3.8, 1.5, 0.3, 0], [5.4, 3.4, 1.7, 0.2, 0], [5.1, 3.7, 1.5, 0.4, 0], [4.6, 3.6, 1.0, 0.2, 0], [5.1, 3.3, 1.7, 0.5, 0], [4.8, 3.4, 1.9, 0.2, 0], [5.0, 3.0, 1.6, 0.2, 0], [5.0, 3.4, 1.6, 0.4, 0], [5.2, 3.5, 1.5, 0.2, 0], [5.2, 3.4, 1.4, 0.2, 0], [4.7, 3.2, 1.6, 0.2, 0], [4.8, 3.1, 1.6, 0.2, 0], [5.4, 3.4, 1.5, 0.4, 0], [5.2, 4.1, 1.5, 0.1, 0], [5.5, 4.2, 1.4, 0.2, 0], [4.9, 3.1, 1.5, 0.1, 0], [5.0, 3.2, 1.2, 0.2, 0], [5.5, 3.5, 1.3, 0.2, 0], [4.9, 3.1, 1.5, 0.1, 0], [4.4, 3.0, 1.3, 0.2, 0], [5.1, 3.4, 1.5, 0.2, 0], [5.0, 3.5, 1.3, 0.3, 0], [4.5, 2.3, 1.3, 0.3, 0], [4.4, 3.2, 1.3, 0.2, 0], [5.0, 3.5, 1.6, 0.6, 0], [5.1, 3.8, 1.9, 0.4, 0], [4.8, 3.0, 1.4, 0.3, 0], [5.1, 3.8, 1.6, 0.2, 0], [4.6, 3.2, 1.4, 0.2, 0], [5.3, 3.7, 1.5, 0.2, 0], [5.0, 3.3, 1.4, 0.2, 0], [7.0, 3.2, 4.7, 1.4, 1], [6.4, 3.2, 4.5, 1.5, 1], [6.9, 3.1, 4.9, 1.5, 1], [5.5, 2.3, 4.0, 1.3, 1], [6.5, 2.8, 4.6, 1.5, 1], [5.7, 2.8, 4.5, 1.3, 1], [6.3, 3.3, 4.7, 1.6, 1], [4.9, 2.4, 3.3, 1.0, 1], [6.6, 2.9, 4.6, 1.3, 1], [5.2, 2.7, 3.9, 1.4, 1], [5.0, 2.0, 3.5, 1.0, 1], [5.9, 3.0, 4.2, 1.5, 1], [6.0, 2.2, 4.0, 1.0, 1], [6.1, 2.9, 4.7, 1.4, 1], [5.6, 2.9, 3.6, 1.3, 1], [6.7, 3.1, 4.4, 1.4, 1], [5.6, 3.0, 4.5, 1.5, 1], [5.8, 2.7, 4.1, 1.0, 1], [6.2, 2.2, 4.5, 1.5, 1], [5.6, 2.5, 3.9, 1.1, 1], [5.9, 3.2, 4.8, 1.8, 1], [6.1, 2.8, 4.0, 1.3, 1], [6.3, 2.5, 4.9, 1.5, 1], [6.1, 2.8, 4.7, 1.2, 1], [6.4, 2.9, 4.3, 1.3, 1], [6.6, 3.0, 4.4, 1.4, 1], [6.8, 2.8, 4.8, 1.4, 1], [6.7, 3.0, 5.0, 1.7, 1], [6.0, 2.9, 4.5, 1.5, 1], [5.7, 2.6, 3.5, 1.0, 1], [5.5, 2.4, 3.8, 1.1, 1], [5.5, 2.4, 3.7, 1.0, 1], [5.8, 2.7, 3.9, 1.2, 1], [6.0, 2.7, 5.1, 1.6, 1], [5.4, 3.0, 4.5, 1.5, 1], [6.0, 3.4, 4.5, 1.6, 1], [6.7, 3.1, 4.7, 1.5, 1], [6.3, 2.3, 4.4, 1.3, 1], [5.6, 3.0, 4.1, 1.3, 1], [5.5, 2.5, 4.0, 1.3, 1], [5.5, 2.6, 4.4, 1.2, 1], [6.1, 3.0, 4.6, 1.4, 1], [5.8, 2.6, 4.0, 1.2, 1], [5.0, 2.3, 3.3, 1.0, 1], [5.6, 2.7, 4.2, 1.3, 1], [5.7, 3.0, 4.2, 1.2, 1], [5.7, 2.9, 4.2, 1.3, 1], [6.2, 2.9, 4.3, 1.3, 1], [5.1, 2.5, 3.0, 1.1, 1], [5.7, 2.8, 4.1, 1.3, 1], [6.3, 3.3, 6.0, 2.5, 2], [5.8, 2.7, 5.1, 1.9, 2], [7.1, 3.0, 5.9, 2.1, 2], [6.3, 2.9, 5.6, 1.8, 2], [6.5, 3.0, 5.8, 2.2, 2], [7.6, 3.0, 6.6, 2.1, 2], [4.9, 2.5, 4.5, 1.7, 2], [7.3, 2.9, 6.3, 1.8, 2], [6.7, 2.5, 5.8, 1.8, 2], [7.2, 3.6, 6.1, 2.5, 2], [6.5, 3.2, 5.1, 2.0, 2], [6.4, 2.7, 5.3, 1.9, 2], [6.8, 3.0, 5.5, 2.1, 2], [5.7, 2.5, 5.0, 2.0, 2], [5.8, 2.8, 5.1, 2.4, 2], [6.4, 3.2, 5.3, 2.3, 2], [6.5, 3.0, 5.5, 1.8, 2], [7.7, 3.8, 6.7, 2.2, 2], [7.7, 2.6, 6.9, 2.3, 2], [6.0, 2.2, 5.0, 1.5, 2], [6.9, 3.2, 5.7, 2.3, 2], [5.6, 2.8, 4.9, 2.0, 2], [7.7, 2.8, 6.7, 2.0, 2], [6.3, 2.7, 4.9, 1.8, 2], [6.7, 3.3, 5.7, 2.1, 2], [7.2, 3.2, 6.0, 1.8, 2], [6.2, 2.8, 4.8, 1.8, 2], [6.1, 3.0, 4.9, 1.8, 2], [6.4, 2.8, 5.6, 2.1, 2], [7.2, 3.0, 5.8, 1.6, 2], [7.4, 2.8, 6.1, 1.9, 2], [7.9, 3.8, 6.4, 2.0, 2], [6.4, 2.8, 5.6, 2.2, 2], [6.3, 2.8, 5.1, 1.5, 2], [6.1, 2.6, 5.6, 1.4, 2], [7.7, 3.0, 6.1, 2.3, 2], [6.3, 3.4, 5.6, 2.4, 2], [6.4, 3.1, 5.5, 1.8, 2], [6.0, 3.0, 4.8, 1.8, 2], [6.9, 3.1, 5.4, 2.1, 2], [6.7, 3.1, 5.6, 2.4, 2], [6.9, 3.1, 5.1, 2.3, 2], [5.8, 2.7, 5.1, 1.9, 2], [6.8, 3.2, 5.9, 2.3, 2], [6.7, 3.3, 5.7, 2.5, 2], [6.7, 3.0, 5.2, 2.3, 2], [6.3, 2.5, 5.0, 1.9, 2], [6.5, 3.0, 5.2, 2.0, 2], [6.2, 3.4, 5.4, 2.3, 2], [5.9, 3.0, 5.1, 1.8, 2]];\n\n";
+// var time = Date.now();
+// var data = snap.val();
+// var trainingData = {};
+// var poseIndex = {
+//     "warriorii": 0,
+//     "tree": 1,
+//     "triangle": 2
+// };
+// ensureDirectoryExistence("./client/test.data");
+// for (const type in types) trainingData[type] = [];
+// for (const key of Object.keys(data)) {
+//     for (const type in types) {
+//         if (data[key][type] && !(data[key][type] == 0 || data[key][type] == 1)) {
+//             data[key][type].push(poseIndex[data[key].pose]);
+//             trainingData[type].push(data[key][type]);
+//         }
+//     }
+// }
+// for (const type in types) {
+//     var dType = types[type].toUpperCase();
+//     jsonDATA += "const " + dType + "_CLASSES = " + JSON.stringify(Object.keys(poseIndex)) + ";\nconst " + dType + "_NUM_CLASSES = " + dType + "_CLASSES.length;\nconst " + dType + "_DATA = " + JSON.stringify(trainingData[type]) + ";\n\n";
+// }
+// jsonDATA += "const IRIS_CLASSES = DEFAULT_CLASSES;\nconst IRIS_NUM_CLASSES = DEFAULT_NUM_CLASSES;\nconst IRIS_DATA = DEFAULT_DATA;"
+// fs.writeFile("./client/training_data.js", jsonDATA, 'utf8', err => {
+//     console.log("Wrote all data types in json from scratch in " + (Date.now() - time) + "ms");
+//     for (const type in types) stringify(trainingData[type], (err, output) => {
+//         output = trainingData[type].length + "," + (trainingData[type][0].length - 1) + "," + Object.keys(poseIndex) + "\n" + output;
+//         fs.writeFile("./client/training_" + types[type] + ".csv", output, 'utf8', err => {
+//             tdb.ref("lastUpdated").set(Date.now());
+//             console.log("Wrote " + types[type] + " data from scratch in " + (Date.now() - time) + "ms");
+//         });
+//     });
+// });
+// ---- OLD CODE TO HANDLE USERS FILES -----
+// adb.ref("users").on("child_added", (snap, prevChildKey) => {
+//     users[snap.val().key] = {"updating": snap.val().updating, "dimensions": snap.val().dimensions};
+//     adb.ref("users/" + snap.val().key + "/updating").on("value", snap => {
+//         users[snap.ref.parent.key].updating = snap.val();
+//     });
+//     adb.ref("users/" + snap.val().key + "/dimensions").on("value", snap => {
+//         users[snap.ref.parent.key].dimensions = snap.val();
+//     });
+// });
+// ---- OLD CODE TO ADD TO HISTORY FILE -----
+// fs.appendFile('./client/history.txt', JSON.stringify(req.body) + "\n", err => {
+//     console.log("Got a POST: " + JSON.stringify(req.body) + "\nSaved to history.txt!");
+//     res.redirect('/');
+// });
+// ---- OLD ROUTING CODE THAT'S OBSOLETE NOW -----
+// app.get('/api', (req, res) => res.send({
+//     "return": 'Hello World @ Yoga Master - App & Training - Server DB API!'
+// }));
+// app.get('/api/getpost', (req, res) => {
+//     console.log("Got a GET POST: " + req.query);
+//     handleTrainingDataPost(req.query);
+//     res.send({
+//         "processing": req.query
+//     });
+// });
+// app.get('/api/deleteKey/:key', (req, res) => {
+//     tdb.ref("frames/" + req.params.key).set(null, () => {
+//         res.send({
+//             "return": "Deleted key " + req.params.key + " data!"
+//         });
+//     });
+// });
+// -------------------- OLD APP HANDLING PROCESSING FUNCTIONS --------------------
+// function handleAppDataUpdating(user, ext, time) {
+//     fs.readFile("./processing/pictures/processed/" + user + "_keypoints.json", 'utf8', (err, data) => {
+//         console.log("Finished reading file " + user + " json after " + (Date.now() - time) + "ms. Processing image...");
+//         if (!data) return;
+//         var openPoseData = extractData(JSON.parse(data));
+//         if (openPoseData[1] == 0 || openPoseData[1] == 1)
+//             updateAppData(user, openPoseData, {}, time);
+//         else imageProcessing("./processing/pictures/" + user + "." + ext, openPoseData[0][0], openPoseData[0][1], openPoseData[0][2], openPoseData[0][3], (err, trainingImage) => {
+//             console.log("Openpose successfully found a whole person!");
+//             updateAppData(user, openPoseData, {
+//                 "latestTensorData/latestProcessedFrame": trainingImage
+//             }, time);
+//         });
+//     });
+// }
+// function updateAppData(user, openPoseData, newData, time) {
+//     openPoseFrameProcessing(("./processing/pictures/processed/" + user + "_rendered.png"), (err, openposeImage) => {
+//         console.log("Finished processing file " + user + " images after " + (Date.now() - time) + "ms. Uploading data...");
+//         newData["lastUpdated"] = Date.now();
+//         newData["latestOpenPoseFrame"] = openposeImage;
+//         for (var type in openPoseData)
+//             if (type > 0) newData["latestTensorData/datatype" + type] = openPoseData[type];
+//         adb.ref("users/" + user).update(newData);
+//     });
+// }
+// -------------------- OLD FILE DELETING HANDLING CODE --------------------
+// delFrame(video, folder, file);
+// removeDirectories('./processing');
+// if (delAftr) delFrame(video, folder, file);
+// removeDirectories('./processing');
+// --------------------- OLD HISTORY REDO HANDLING CODE --------------------
+// var count = 0;
+// lineReader.eachLine('history.txt', (line, last) => {
+//     console.log("Started redownload of the processing folder using history.txt...");
+//     request.post("localhost:" + server.address().port + "/postapi").form(JSON.parse(line)); //FIX FOR ALEX'S HOME SERVER
+//     count++;
+//     if (last) res.send({
+//         "return": "ReDownloaded " + count + " requests!"
+//     });
+// });
+// var l_shoulder = parseFloat((magnitude(keypoints[15], keypoints[16], avgX, avgY) / width).toFixed(4));
+// var r_shoulder = parseFloat((magnitude(keypoints[6], keypoints[7], avgX, avgY) / width).toFixed(4));
+// var l_arm = parseFloat((magnitude(keypoints[18], keypoints[19], avgX, avgY) / width).toFixed(4));
+// var r_arm = parseFloat((magnitude(keypoints[9], keypoints[10], avgX, avgY) / width).toFixed(4));
+// var l_farm = parseFloat((magnitude(keypoints[21], keypoints[22], avgX, avgY) / width).toFixed(4));
+// var r_farm = parseFloat((magnitude(keypoints[12], keypoints[13], avgX, avgY) / width).toFixed(4));
+// var l_spine = parseFloat((magnitude(keypoints[33], keypoints[34], avgX, avgY) / width).toFixed(4));
+// var r_spine = parseFloat((magnitude(keypoints[24], keypoints[25], avgX, avgY) / width).toFixed(4));
+// var l_thigh = parseFloat((magnitude(keypoints[36], keypoints[37], avgX, avgY) / width).toFixed(4));
+// var r_thigh = parseFloat((magnitude(keypoints[27], keypoints[28], avgX, avgY) / width).toFixed(4));
+// var l_leg = parseFloat((magnitude(keypoints[39], keypoints[40], avgX, avgY) / width).toFixed(4));
+// var r_leg = parseFloat((magnitude(keypoints[30], keypoints[31], avgX, avgY) / width).toFixed(4));
