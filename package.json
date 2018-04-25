@@ -4,8 +4,8 @@
   "description": "The server that allows us to put in a YouTube Video with time-frames indicating positions, to analyze with OpenPose and do image conversions to store on our Firebase Training DB",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon --ignore client/ --ignore training/ --ignore processing/ --watch server.js"
+    "test": "nodemon --ignore client/ --ignore training/ --ignore processing/ --watch server.js",
+    "start": "node server.js"
   },
   "repository": {
     "type": "git",

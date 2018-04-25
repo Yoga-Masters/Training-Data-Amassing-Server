@@ -64,7 +64,7 @@ adb.ref("size").on("value", snap => {
 });
 adb.ref("maxFPS").on("value", snap => {
     maxFPS = snap.val();
-    console.log("maxFPS got updated to: " + maxFPS + "px!");
+    console.log("maxFPS got updated to: " + maxFPS + " fps!");
 });
 tdb.ref("types").on("value", snap => {
     types = snap.val();
@@ -86,6 +86,7 @@ tdb.ref("queue").on("value", (snap) => {
         handleTrainingDataPost(snapshot, (done) => {
             if (!done) {
                 console.log("Invalid request. Deleted & Exited.");
+                working = false;
                 tdb.ref("queue/" + snapKey).set(null);
             } else {
                 tdb.ref("lastUpdated").set(Date.now());
@@ -121,15 +122,20 @@ function handleTrainingDataPost(body, cb) { // Download a video, convert it to f
         var length = (Object.keys(body).length - 1) / 5;
         console.log("body: " + JSON.stringify(body));
         console.log("length: " + length);
-        for (var i = 1; i <= length; i++) {
-            var pose = body["selectedPose" + i];
-            if (framesDict[pose] === undefined) framesDict[pose] = [];
-            framesDict[pose].push([
-                (parseInt(body["startTimeStampMin" + i]) * 60 + parseInt(body["startTimeStampSec" + i])) * fps,
-                (parseInt(body["endTimeStampMin" + i]) * 60 + parseInt(body["endTimeStampSec" + i])) * fps
-            ]);
+        if(length == 0) {
+            console.log("No frames to get from the video ID \"" + videoID + "\" from \"" + body.url + "\"");
+            cb(false);
+        } else {
+            for (var i = 1; i <= length; i++) {
+                var pose = body["selectedPose" + i];
+                if (framesDict[pose] === undefined) framesDict[pose] = [];
+                framesDict[pose].push([
+                    (parseInt(body["startTimeStampMin" + i]) * 60 + parseInt(body["startTimeStampSec" + i])) * fps,
+                    (parseInt(body["endTimeStampMin" + i]) * 60 + parseInt(body["endTimeStampSec" + i])) * fps
+                ]);
+            }
+            convertToFrames(framesDict, videoID, framesFolder, fps, cb);
         }
-        convertToFrames(framesDict, videoID, framesFolder, fps, cb);
     });
 }
 
@@ -265,12 +271,8 @@ function downloadYoutubeVideo(url, folder, callback) { // Check if a video is do
             quality: 'highestvideo',
             filter: format => format.container === 'mp4' && format.audioEncoding === null
         }).pipe(videoDownload);
-        videoDownload.on('open', data => {
-            console.log("Started downloading video " + url + " after " + (Date.now() - time) + "ms");
-        });
-        videoDownload.on('error', data => {
-            console.log("Video " + url + " FAILED TO DOWNLOAD after " + (Date.now() - time) + "ms");
-        });
+        videoDownload.on('open', data => { console.log("Started downloading video " + url + " after " + (Date.now() - time) + "ms"); });
+        videoDownload.on('error', data => { console.log("Video " + url + " FAILED TO DOWNLOAD after " + (Date.now() - time) + "ms"); });
         videoDownload.on('finish', () => {
             fs.rename(dirStart, dirDone, err => {
                 console.log("Finished downloading video " + url + " after " + (Date.now() - time) + "ms");
@@ -389,7 +391,6 @@ function extractMagnitudes(keypoints, size) {
     }
     avgX = avgX / 13;
     avgY = avgY / 13;
-    // console.log("AvgX: " + avgX + " | AvgY: " + avgY + " || Width: " + size + " | Height: " + size);
     return [
         parseFloat((magnitude(keypoints[15], keypoints[16], avgX, avgY) / size).toFixed(4)),
         parseFloat((magnitude(keypoints[6], keypoints[7], avgX, avgY) / size).toFixed(4)),
@@ -440,12 +441,12 @@ function extractAngleRelativeToLine(keypoints) {
 }
 // ======================== IMAGE PROCESSING FUNCTIONS ========================
 function imageProcessing(path, x1, y1, x2, y2, cb) {
-    console.log(x1, y1, x2, y2);
+    var bg = background.clone();
     jimp.read(path, (err, image) => {
         if (err) {
             cb(false)
             console.log(err);
-        } else background.resize((x2 - x1), (y2 - y1)) // Resizes the 1x1 Gray to the size we need it
+        } else bg.resize((x2 - x1), (y2 - y1)) // Resizes the 1x1 Gray to the size we need it
             .composite(image, -x1, -y1) //Composite the image to have no Grey
             .resize(size, size) //resize to 100 x 100
             .quality(100) // set JPEG quality
