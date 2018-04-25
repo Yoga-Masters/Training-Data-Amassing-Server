@@ -74,7 +74,7 @@ tdb.ref("delete").on("value", snap => {
     delAftr = snap.val();
     console.log("delAftr got updated to: " + delAftr);
 });
-tdb.ref("queue").on("value", (snap) => {
+tdb.ref("queue").on("value", (snap) => { // TODO: ADD A STATUS TO THE QUE THAT IS UPDATED AS THE THING MOVES ALONG, AND GETS DELETED WHEN MOVED INTO HISTORY
     if (!snap.val()) return;
     var snapKey = Object.keys(snap.val())[0];
     var snapshot = snap.val()[snapKey];
@@ -100,15 +100,6 @@ tdb.ref("queue").on("value", (snap) => {
         });
     }
 });
-// =============================== ROUTING SETUP ===============================
-// TODO: MOVE FUNCTIONALITY TO SEPERATE METHOD THAT DOES THE SAME THING AS QUE HANDLING
-app.get('/api/redownload', (req, res) => {
-    tdb.ref("history").once("value", (snap) => {
-        tdb.ref("queue").update(snap.val(), () => {
-            res.send({"return": "done!"});
-        });
-    });
-});
 // ======================== YOUTUBE DOWNLOADER FUNCTIONS =======================
 function handleTrainingDataPost(body, cb) { // Download a video, convert it to frames, then upload the processed frames to firebase to train.
     var framesFolder = getRandomKey();
@@ -122,7 +113,7 @@ function handleTrainingDataPost(body, cb) { // Download a video, convert it to f
         var length = (Object.keys(body).length - 1) / 5;
         console.log("body: " + JSON.stringify(body));
         console.log("length: " + length);
-        if(length == 0) {
+        if (length == 0) {
             console.log("No frames to get from the video ID \"" + videoID + "\" from \"" + body.url + "\"");
             cb(false);
         } else {
@@ -271,8 +262,12 @@ function downloadYoutubeVideo(url, folder, callback) { // Check if a video is do
             quality: 'highestvideo',
             filter: format => format.container === 'mp4' && format.audioEncoding === null
         }).pipe(videoDownload);
-        videoDownload.on('open', data => { console.log("Started downloading video " + url + " after " + (Date.now() - time) + "ms"); });
-        videoDownload.on('error', data => { console.log("Video " + url + " FAILED TO DOWNLOAD after " + (Date.now() - time) + "ms"); });
+        videoDownload.on('open', data => {
+            console.log("Started downloading video " + url + " after " + (Date.now() - time) + "ms");
+        });
+        videoDownload.on('error', data => {
+            console.log("Video " + url + " FAILED TO DOWNLOAD after " + (Date.now() - time) + "ms");
+        });
         videoDownload.on('finish', () => {
             fs.rename(dirStart, dirDone, err => {
                 console.log("Finished downloading video " + url + " after " + (Date.now() - time) + "ms");
@@ -325,7 +320,7 @@ function extractData(poseData) {
     var personIndex = -1;
     for (var p = poseData.people.length - 1; p > -1; p--) {
         personIndex = p;
-        for (var i = 3; i < 42; i++) // Change personIndex back to -1 if person data is incomplete 
+        for (var i = 3; i < 42; i++) // Change personIndex back to -1 if person data is incomplete
             if (poseData.people[p].pose_keypoints[i] == 0) personIndex = -1;
     }
     if (personIndex == -1) return output; // Return 1s for incomplete person in frame
@@ -340,8 +335,8 @@ function extractData(poseData) {
 /*
     Finds cropping dimensions for pose image.
     Inputs keypoints array from a JSON output from openpose
-    Return [Upper left X coord, 
-            Upper left Y coord, 
+    Return [Upper left X coord,
+            Upper left Y coord,
             Lower right X coord.
             Lower right Y coord]
     If no pose is found, return [280, 0, 1000, 720], a default center square for 720p webcams
@@ -550,7 +545,7 @@ Degree  Shape (points 1 and 2)
         2
 -------------
         1
-135     |\                 
+135     |\
         | 2
 -------------
         1
@@ -646,7 +641,7 @@ function AngleRelativeToLine(x1, y1, x2, y2) {
 // });
 // ---------
 // older version that updates everything
-// function handleAppDataUpdating(user, ext, time) { 
+// function handleAppDataUpdating(user, ext, time) {
 //     for (const user of Object.keys(users)) {
 //         console.log("Starting reading files for " + user + " after " + (Date.now() - time) + "ms...");
 //         if (!users[user]) return;
