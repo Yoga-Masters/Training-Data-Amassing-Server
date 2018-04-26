@@ -62,7 +62,7 @@ adb.ref("size").on("value", snap => {
     size = snap.val();
     console.log("Size got updated to: " + size + "px!");
 });
-adb.ref("maxFPS").on("value", snap => {
+tdb.ref("maxFPS").on("value", snap => {
     maxFPS = snap.val();
     console.log("maxFPS got updated to: " + maxFPS + " fps!");
 });
