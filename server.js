@@ -343,6 +343,7 @@ function extractData(poseData) {
     output[2] = extractRelativeCoordinates(keypoints, output[0]); //Relative coordinates
     output[3] = extractAngleRelativeToLine(keypoints); //Angle relative to vertical line
     output[4] = output[3].concat(output[1]); //Concat of relative angles to vertical line and relative magnitudes
+    output[5] = output[3].concat(output[1].concat(output[2])); //Concat of relative angles and relative magnitudes and relative positions
     return output;
 }
 // Finds cropping dimensions for pose image.
@@ -510,6 +511,7 @@ function readPose(name) {
     if (name.toLowerCase().includes("warriorii")) return "warriorii";
     else if (name.toLowerCase().includes("tree")) return "tree";
     else if (name.toLowerCase().includes("triangle")) return "triangle";
+    else if (name.toLowerCase().includes("none")) return "none";
     else return false;
 }
 
