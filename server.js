@@ -57,20 +57,15 @@ console.log("Connected to yogamaster app firebase as \"" + appAdmin.name + "\"")
 var tdb = admin.database();
 var adb = appAdmin.database();
 // ========================= PASSIVE FIREBASE FUNCTIONS ========================
-adb.ref("size").on("value", snap => {
-    size = snap.val();
+tdb.ref("config").on("value", snap => {
+    var config = snap.val();
+    size = config.size;
     console.log("Size got updated to: " + size + "px!");
-});
-tdb.ref("maxFPS").on("value", snap => {
-    maxFPS = snap.val();
+    maxFPS = config.maxFPS;
     console.log("maxFPS got updated to: " + maxFPS + " fps!");
-});
-tdb.ref("types").on("value", snap => {
-    types = snap.val();
+    types = config.types;
     console.log("types got updated to: " + JSON.stringify(types));
-});
-tdb.ref("delete").on("value", snap => {
-    delAftr = snap.val();
+    delAftr = config.delete;
     console.log("delAftr got updated to: " + delAftr);
 });
 tdb.ref("queue").on("child_added", (snap) => {
@@ -96,7 +91,7 @@ function handleQueue(snap) {
                     tdb.ref("queue/" + snapkey).set(null);
                 });
                 else pQ(snapkey, "Request complete. Moved to history & exited.", () => {
-                    tdb.ref("lastUpdated").set(Date.now());
+                    tdb.ref("config/lastUpdated").set(Date.now());
                     tdb.ref("history/" + snapkey).set(snapshot, () => {
                         working = false;
                         tdb.ref("queue/" + snapkey).set(null);
